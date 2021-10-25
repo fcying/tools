@@ -1,0 +1,131 @@
+name: tools
+
+on:
+  schedule:
+  - cron: '0 18 * * *'
+  #push:
+  #  branches: [ master, test ]
+  workflow_dispatch:
+
+env:
+  llvm_ver: 12.0.1
+
+jobs:
+  linux:
+    runs-on: ubuntu-18.04
+    outputs:
+      winscp_ver: ${{ steps.winscp.outputs.version }}
+      putty_ver: ${{ steps.putty.outputs.version }}
+    steps:
+      - name: Download llvm
+        run: |
+          mkdir -p ~/tools
+          wget -qOllvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_ver}/clang+llvm-${llvm_ver}-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
+          tar xJf llvm.tar.xz
+          pwd && ls
+          mv clang* llvm
+      - name: Build ccls
+        run: |
+          cat /proc/cpuinfo | grep processor
+          git clone --depth=1 --recursive https://github.com/MaskRay/ccls
+          cd ccls
+          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
+          cmake --build Release
+          mv Release/ccls .
+          7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
+
+      - name: Get winscp
+        id: winscp
+        run: |
+          ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
+          mkdir -p winscp && cd $_
+          wget -qOwinscp.zip https://jaist.dl.sourceforge.net/project/winscp/WinSCP/${ver}/WinSCP-${ver}-Portable.zip
+          unzip winscp.zip && rm winscp.zip
+          7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
+          echo "::set-output name=version::$ver"
+
+      - name: Get putty
+        id: putty
+        run: |
+          ver=$(curl -s "https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html" | grep -Po "(?<=latest release \()\d\.\d+" | head -1)
+          mkdir -p putty && cd $_
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/putty.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pscp.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/psftp.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttytel.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pageant.exe
+          7z -mx9 a ~/tools/putty_${ver}.zip ../putty
+          echo "::set-output name=version::$ver"
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: tools
+          path: ~/tools
+          retention-days: 1
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+      - name: Download llvm
+        run: |
+          cd /d c:\
+          curl -L -ollvm.7z https://github.com/fcying/tools/releases/download/llvm-v${{ env.llvm_ver }}/llvm_msvc.7z
+          7z x llvm.7z
+          dir
+      - name: Build ccls
+        run: |
+          git clone --depth=1 --recursive https://github.com/MaskRay/ccls
+          cd ccls
+          cmake -H. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH="c:/llvm/Release"
+          ninja -C Release
+
+          mkdir ccls
+          copy Release\ccls.exe .\ccls\
+          copy c:\Windows\System32\vcruntime140_1.dll .\ccls\
+          copy c:\Windows\System32\vcruntime140.dll .\ccls\
+          copy c:\Windows\System32\msvcp140.dll .\ccls\
+
+          7z -mx9 a ..\ccls_windows_amd64.zip ccls
+      - uses: actions/upload-artifact@v2
+        with:
+          name: tools
+          path: ./ccls_windows_amd64.zip
+          retention-days: 1
+
+  publish:
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+      - name: Download data
+        run: ls -la
+
+      - uses: dev-drprasad/delete-tag-and-release@v0.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          delete_release: true
+          tag_name: tools
+
+      - uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: tools
+          artifactErrorsFailBuild: true
+          allowUpdates: true
+          replacesArtifacts: true
+          removeArtifacts: true
+          artifacts: "./tools/*"
+          body: |
+            * ccls
+            build with llvm ${{ env.llvm_ver }}
+            Linux: os >= ubuntu 14.04 &ensp;&ensp; glibc >= 2.17
+            * putty ${{ needs.linux.outputs.putty_ver }}
+            * winscp ${{ needs.linux.outputs.winscp_ver }}

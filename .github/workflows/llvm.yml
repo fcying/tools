@@ -1,0 +1,100 @@
+name: llvm
+
+on:
+  schedule:
+  - cron: '0 18 * * 1'
+  push:
+    tags: v[0-9]+.[0-9]+.[0-9]+
+  workflow_dispatch:
+    inputs:
+      llvm_ver:
+        description: "llvm version(e.g. latest 12.0.1 13.0.0)"
+        required: true
+        default: "latest"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+        working-directory: C:\
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+          toolset: 14.16
+
+      - uses: olegtarasov/get-tag@v2.1.1
+        id: tagName
+        with:
+          tagRegex: "v(.*)"
+
+      - name: Check version
+        run: |
+          echo "llvm_ver:" ${{ github.event.inputs.llvm_ver }}
+          echo "event_name:" ${{ github.event_name }}
+      - if: github.event.inputs.llvm_ver == 'latest' || github.event_name == 'schedule'
+        run: |
+          echo ver=latest>> %GITHUB_ENV%
+          echo branch=main>> %GITHUB_ENV%
+      - if: github.event.inputs.llvm_ver != '' && github.event.inputs.llvm_ver != 'latest'
+        run: |
+          echo ver=v${{ github.event.inputs.llvm_ver }}>> %GITHUB_ENV%
+          echo branch=llvmorg-${{ github.event.inputs.llvm_ver }}>> %GITHUB_ENV%
+      - if: github.event_name == 'push'
+        run: |
+          echo ver=v${{ steps.tagName.outputs.tag }}>> %GITHUB_ENV%
+          echo branch=llvmorg-${{ steps.tagName.outputs.tag }}>> %GITHUB_ENV%
+      - id: version
+        run: echo ::set-output name=version::${{ env.ver }}
+
+      - name: Build llvm
+        run: |
+          git clone --depth=1 https://github.com/llvm/llvm-project.git -b ${{ env.branch }} llvm
+          cd llvm
+          rmdir /s /q .git
+          cmake -Hllvm -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_PROJECTS=clang
+          ninja -C Release clangFormat clangFrontendTool clangIndex clangTooling clang
+
+      - name: Compress llvm
+        run: |
+          7z a llvm_msvc.7z -mx9 llvm
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: llvm
+          path: c:\llvm_msvc.7z
+          retention-days: 1
+
+  publish:
+    needs: [windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+      - name: Download data
+        run: ls -la
+
+      - uses: dev-drprasad/delete-tag-and-release@v0.2.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          delete_release: true
+          tag_name: llvm-${{ needs.windows.outputs.version }}
+
+      - uses: ncipollo/release-action@v1.8.10
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: llvm-${{ needs.windows.outputs.version }}
+          prerelease: ${{ needs.windows.outputs.version == 'latest' }}
+          artifactErrorsFailBuild: true
+          allowUpdates: true
+          replacesArtifacts: true
+          removeArtifacts: true
+
+          artifacts: "./llvm/llvm_msvc.7z"
+          body: |
+            llvm version: ${{ needs.windows.outputs.version }}
+            VC++ compiler toolset version: 14.16
