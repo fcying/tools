@@ -79,7 +79,8 @@ jobs:
           cat /proc/cpuinfo | grep processor
           git clone --depth=1 --recursive https://github.com/MaskRay/ccls
           cd ccls
-          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
+          #cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
+          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl"
           cmake --build Release
           mv Release/ccls .
           chmod a+x ./ccls
