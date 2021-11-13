@@ -11,28 +11,27 @@ env:
   llvm_ver: 12.0.1
 
 jobs:
-  linux:
-    runs-on: ubuntu-18.04
+  ubuntu2004:
+    runs-on: ubuntu-20.04
     outputs:
       winscp_ver: ${{ steps.winscp.outputs.version }}
       putty_ver: ${{ steps.putty.outputs.version }}
+      tig_ver: ${{ steps.tig.outputs.version }}
     steps:
-      - name: Download llvm
+      - name: Build tig
+        id: tig
         run: |
-          mkdir -p ~/tools
-          wget -qOllvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_ver}/clang+llvm-${llvm_ver}-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
-          tar xJf llvm.tar.xz
-          pwd && ls
-          mv clang* llvm
-      - name: Build ccls
-        run: |
-          cat /proc/cpuinfo | grep processor
-          git clone --depth=1 --recursive https://github.com/MaskRay/ccls
-          cd ccls
-          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
-          cmake --build Release
-          mv Release/ccls .
-          7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
+          sudo apt-get install -y libncurses5-dev pkg-config
+          ver=$(curl -s "https://github.com/jonas/tig/releases/latest" | grep -Po "(\d+\.){2}\d+")
+          wget -Otig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
+          tar xzf tig.tgz
+          cd tig-$ver
+          ./configure LDFLAGS=-static
+          make
+          cd src
+          chmod a+x ./tig
+          7z -mx9 a ~/tools/tig_${ver}.zip ./tig
+          echo "::set-output name=version::$ver"
 
       - name: Get winscp
         id: winscp
@@ -55,8 +54,36 @@ jobs:
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttytel.exe
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pageant.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttygen.exe
           7z -mx9 a ~/tools/putty_${ver}.zip ../putty
           echo "::set-output name=version::$ver"
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: tools
+          path: ~/tools
+          retention-days: 1
+
+  ccls:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Download llvm
+        run: |
+          mkdir -p ~/tools
+          wget -qOllvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_ver}/clang+llvm-${llvm_ver}-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
+          tar xJf llvm.tar.xz
+          pwd && ls
+          mv clang* llvm
+      - name: Build ccls
+        run: |
+          cat /proc/cpuinfo | grep processor
+          git clone --depth=1 --recursive https://github.com/MaskRay/ccls
+          cd ccls
+          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
+          cmake --build Release
+          mv Release/ccls .
+          chmod a+x ./ccls
+          7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
 
       - uses: actions/upload-artifact@v2
         with:
@@ -100,7 +127,7 @@ jobs:
           retention-days: 1
 
   publish:
-    needs: [linux, windows]
+    needs: [ubuntu2004, ccls, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v2
@@ -127,5 +154,6 @@ jobs:
             * ccls
             build with llvm ${{ env.llvm_ver }}
             Linux: os >= ubuntu 14.04 &ensp;&ensp; glibc >= 2.17
-            * putty ${{ needs.linux.outputs.putty_ver }}
-            * winscp ${{ needs.linux.outputs.winscp_ver }}
+            * putty ${{ needs.ubuntu2004.outputs.putty_ver }}
+            * winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}
+            * tig ${{ needs.ubuntu2004.outputs.tig_ver }}
