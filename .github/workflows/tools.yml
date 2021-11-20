@@ -2,7 +2,7 @@ name: tools
 
 on:
   schedule:
-  - cron: '0 20 * * *'
+  - cron: '0 18 * * *'
   #push:
   #  branches: [ master, test ]
   workflow_dispatch:
@@ -21,11 +21,31 @@ jobs:
       - name: Build tig
         id: tig
         run: |
-          sudo apt-get install -y libncurses5-dev pkg-config
+          # remove system ncurses
+          sudo apt purge -y libncurses-dev
+
+          # install ncursesw
+          wget -qOncurses.tgz https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
+          tar xzf ncurses.tgz
+          cd ncurses-*
+          ./configure --enable-widec
+          make
+          sudo make install
+          cd -
+
+          # install readline
+          wget -qOreadline.tgz https://ftp.gnu.org/gnu/readline/readline-8.1.tar.gz
+          tar xzf readline.tgz
+          cd readline-*
+          ./configure
+          make
+          sudo make install
+          cd -
+
           ver=$(curl -s "https://github.com/jonas/tig/releases/latest" | grep -Po "(\d+\.){2}\d+")
-          wget -Otig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
+          wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
           tar xzf tig.tgz
-          cd tig-$ver
+          cd tig-*
           ./configure LDFLAGS=-static
           make
           cd src
@@ -85,13 +105,13 @@ jobs:
           mv Release/ccls .
           chmod a+x ./ccls
           7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
-
+  
       - uses: actions/upload-artifact@v2
         with:
           name: tools
           path: ~/tools
           retention-days: 1
-
+  
   windows:
     runs-on: windows-latest
     defaults:
@@ -113,13 +133,13 @@ jobs:
           cd ccls
           cmake -H. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH="c:/llvm/Release"
           ninja -C Release
-
+  
           mkdir ccls
           copy Release\ccls.exe .\ccls\
           copy c:\Windows\System32\vcruntime140_1.dll .\ccls\
           copy c:\Windows\System32\vcruntime140.dll .\ccls\
           copy c:\Windows\System32\msvcp140.dll .\ccls\
-
+  
           7z -mx9 a ..\ccls_windows_amd64.zip ccls
       - uses: actions/upload-artifact@v2
         with:
@@ -128,33 +148,26 @@ jobs:
           retention-days: 1
 
   publish:
+    #needs: [ubuntu2004]
     needs: [ubuntu2004, ccls, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - uses: actions/download-artifact@v2
       - name: Download data
         run: ls -la
 
-      - uses: dev-drprasad/delete-tag-and-release@v0.2.0
+      - name: Publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          delete_release: true
-          tag_name: tools
-
-      - uses: ncipollo/release-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: tools
-          artifactErrorsFailBuild: true
-          allowUpdates: true
-          replacesArtifacts: true
-          removeArtifacts: true
-          artifacts: "./tools/*"
-          body: |
-            * ccls
-            build with llvm ${{ env.llvm_ver }}
-            Linux: os >= ubuntu 14.04 &ensp;&ensp; glibc >= 2.17
-            * putty ${{ needs.ubuntu2004.outputs.putty_ver }}
-            * winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}
-            * tig ${{ needs.ubuntu2004.outputs.tig_ver }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "* ccls"
+            echo "build with llvm ${{ env.llvm_ver }}"
+            echo "Linux: os >= ubuntu 14.04 &ensp;&ensp; glibc >= 2.17"
+            echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
+            echo "* winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}"
+            echo "* tig ${{ needs.ubuntu2004.outputs.tig_ver }}"
+          } | tee /tmp/note.md
+          gh release delete tools -y || true
+          gh release create tools -t "tools" -F "/tmp/note.md" --target $GITHUB_SHA ./tools/*
