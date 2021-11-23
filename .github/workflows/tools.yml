@@ -28,7 +28,7 @@ jobs:
           wget -qOncurses.tgz https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
           tar xzf ncurses.tgz
           cd ncurses-*
-          ./configure --enable-widec
+          ./configure --enable-widec --enable-pc-files --with-terminfo-dirs="/etc/terminfo:/lib/terminfo:/usr/share/terminfo" --without-debug --without-tests
           make
           sudo make install
           cd -
@@ -105,13 +105,13 @@ jobs:
           mv Release/ccls .
           chmod a+x ./ccls
           7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
-  
+
       - uses: actions/upload-artifact@v2
         with:
           name: tools
           path: ~/tools
           retention-days: 1
-  
+
   windows:
     runs-on: windows-latest
     defaults:
@@ -133,13 +133,13 @@ jobs:
           cd ccls
           cmake -H. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH="c:/llvm/Release"
           ninja -C Release
-  
+
           mkdir ccls
           copy Release\ccls.exe .\ccls\
           copy c:\Windows\System32\vcruntime140_1.dll .\ccls\
           copy c:\Windows\System32\vcruntime140.dll .\ccls\
           copy c:\Windows\System32\msvcp140.dll .\ccls\
-  
+
           7z -mx9 a ..\ccls_windows_amd64.zip ccls
       - uses: actions/upload-artifact@v2
         with:
