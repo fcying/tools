@@ -4,6 +4,7 @@
 * [winscp](https://winscp.net)
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)
 * [tig](https://github.com/jonas/tig)
+* [bear](https://github.com/rizsotto/Bear)
 * [ccls](https://github.com/MaskRay/ccls)
 * [llvm](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option

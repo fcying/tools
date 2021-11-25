@@ -22,7 +22,7 @@ jobs:
         id: tig
         run: |
           # remove system ncurses
-          sudo apt purge -y libncurses-dev
+          sudo apt-get purge -y libncurses-dev
 
           # install ncursesw
           wget -qOncurses.tgz https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
@@ -84,6 +84,32 @@ jobs:
           path: ~/tools
           retention-days: 1
 
+  bear:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Build bear
+        run: |
+          mkdir -p ~/tools
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get install -y gcc-8 g++-8
+
+          export CC=/usr/bin/gcc-8
+          export CXX=/usr/bin/g++-8
+
+          git clone https://github.com/rizsotto/Bear bear
+          cd bear
+          cmake -B Release -DENABLE_UNIT_TESTS=OFF -DENABLE_FUNC_TESTS=OFF
+          cmake --build Release -j2
+          cp Release/stage/bin/bear .
+          chmod a+x bear
+          7z -mx9 a ~/tools/bear_linux_amd64.zip ./bear
+      - uses: actions/upload-artifact@v2
+        with:
+          name: tools
+          path: ~/tools
+          retention-days: 1
+
   ccls:
     runs-on: ubuntu-18.04
     steps:
@@ -99,13 +125,12 @@ jobs:
           cat /proc/cpuinfo | grep processor
           git clone --depth=1 --recursive https://github.com/MaskRay/ccls
           cd ccls
-          #cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
-          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl"
+          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
+          #cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl"
           cmake --build Release
           mv Release/ccls .
           chmod a+x ./ccls
           7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
-
       - uses: actions/upload-artifact@v2
         with:
           name: tools
@@ -149,7 +174,7 @@ jobs:
 
   publish:
     #needs: [ubuntu2004]
-    needs: [ubuntu2004, ccls, windows]
+    needs: [ubuntu2004, ccls, bear, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -168,6 +193,7 @@ jobs:
             echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
             echo "* winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}"
             echo "* tig ${{ needs.ubuntu2004.outputs.tig_ver }}"
+            echo "* bear nightly build"
           } | tee /tmp/note.md
           gh release delete tools -y || true
           gh release create tools -t "tools" -F "/tmp/note.md" --target $GITHUB_SHA ./tools/*
