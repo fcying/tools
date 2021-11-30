@@ -16,6 +16,7 @@ jobs:
     outputs:
       winscp_ver: ${{ steps.winscp.outputs.version }}
       putty_ver: ${{ steps.putty.outputs.version }}
+      mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
       tig_ver: ${{ steps.tig.outputs.version }}
     steps:
       - name: Build tig
@@ -76,6 +77,17 @@ jobs:
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pageant.exe
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttygen.exe
           7z -mx9 a ~/tools/putty_${ver}.zip ../putty
+          echo "::set-output name=version::$ver"
+
+      - name: Get MobaXterm
+        id: mobaxterm
+        run: |
+          moba_link=$(curl -s https://mobaxterm.mobatek.net/download-home-edition.html | grep -Po "https:.*?Portable.*?\.zip" | head -1)
+          ver=$(echo $moba_link | grep -Po "\d+\.\d+")
+          wget -q $moba_link
+          7z x MobaXterm*.zip -oMobaXterm
+          mv MobaXterm/MobaXterm* MobaXterm/MobaXterm.exe
+          7z -mx9 a ~/tools/MobaXterm_${ver}.zip ./MobaXterm
           echo "::set-output name=version::$ver"
 
       - uses: actions/upload-artifact@v2
@@ -191,6 +203,7 @@ jobs:
             echo "build with llvm ${{ env.llvm_ver }}"
             echo "Linux: os >= ubuntu 14.04 &ensp;&ensp; glibc >= 2.17"
             echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
+            echo "* MobaXterm ${{ needs.ubuntu2004.outputs.mobaxterm_ver }}"
             echo "* winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}"
             echo "* tig ${{ needs.ubuntu2004.outputs.tig_ver }}"
             echo "* bear nightly build"
