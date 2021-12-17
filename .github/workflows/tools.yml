@@ -209,4 +209,5 @@ jobs:
             echo "* bear nightly build"
           } | tee /tmp/note.md
           gh release delete tools -y || true
+          git push origin :tools || true
           gh release create tools -t "tools" -F "/tmp/note.md" --target $GITHUB_SHA ./tools/*

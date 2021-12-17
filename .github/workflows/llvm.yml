@@ -73,28 +73,24 @@ jobs:
     needs: [windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - uses: actions/download-artifact@v2
       - name: Download data
         run: ls -la
-
-      - uses: dev-drprasad/delete-tag-and-release@v0.2.0
+      - name: Publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          delete_release: true
-          tag_name: llvm-${{ needs.windows.outputs.version }}
-
-      - uses: ncipollo/release-action@v1.8.10
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: llvm-${{ needs.windows.outputs.version }}
-          prerelease: ${{ needs.windows.outputs.version == 'latest' }}
-          artifactErrorsFailBuild: true
-          allowUpdates: true
-          replacesArtifacts: true
-          removeArtifacts: true
-
-          artifacts: "./llvm/llvm_msvc.7z"
-          body: |
-            llvm version: ${{ needs.windows.outputs.version }}
-            VC++ compiler toolset version: 14.16
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "llvm version: ${{ needs.windows.outputs.version }}"
+            echo "VC++ compiler toolset version: 14.16"
+          } | tee /tmp/note.md
+          tag_name=llvm-${{ needs.windows.outputs.version }}
+          if [ "${{ needs.windows.outputs.version }}" == "latest" ]; then
+            prerelease="-p"
+          else
+            prerelease=""
+          fi
+          gh release delete $tag_name -y || true
+          git push origin :$tag_name || true
+          gh release create $tag_name $prerelease -t "$tag_name" -F "/tmp/note.md" --target $GITHUB_SHA ./llvm/*
