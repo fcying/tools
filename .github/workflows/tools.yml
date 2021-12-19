@@ -23,10 +23,11 @@ jobs:
         id: tig
         run: |
           # remove system ncurses
-          sudo apt-get purge -y libncurses-dev
+          sudo apt-get remove -y libncurses-dev
 
           # install ncursesw
-          wget -qOncurses.tgz https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
+          # https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
+          wget -qOncurses.tgz https://mirrors.aliyun.com/gnu/ncurses/ncurses-6.3.tar.gz
           tar xzf ncurses.tgz
           cd ncurses-*
           ./configure --enable-widec --enable-pc-files --with-terminfo-dirs="/etc/terminfo:/lib/terminfo:/usr/share/terminfo" --without-debug --without-tests
@@ -35,7 +36,8 @@ jobs:
           cd -
 
           # install readline
-          wget -qOreadline.tgz https://ftp.gnu.org/gnu/readline/readline-8.1.tar.gz
+          # https://ftp.gnu.org/gnu/readline/readline-8.1.tar.gz
+          wget -qOreadline.tgz https://mirrors.aliyun.com/gnu/readline/readline-8.1.tar.gz
           tar xzf readline.tgz
           cd readline-*
           ./configure
@@ -96,34 +98,8 @@ jobs:
           path: ~/tools
           retention-days: 1
 
-  bear:
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Build bear
-        run: |
-          mkdir -p ~/tools
-          sudo apt-get install -y software-properties-common
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get install -y gcc-8 g++-8
-
-          export CC=/usr/bin/gcc-8
-          export CXX=/usr/bin/g++-8
-
-          git clone https://github.com/rizsotto/Bear bear
-          cd bear
-          cmake -B Release -DENABLE_UNIT_TESTS=OFF -DENABLE_FUNC_TESTS=OFF
-          cmake --build Release -j2
-          cp Release/stage/bin/bear .
-          chmod a+x bear
-          7z -mx9 a ~/tools/bear_linux_amd64.zip ./bear
-      - uses: actions/upload-artifact@v2
-        with:
-          name: tools
-          path: ~/tools
-          retention-days: 1
-
   ccls:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Download llvm
         run: |
@@ -135,11 +111,16 @@ jobs:
       - name: Build ccls
         run: |
           cat /proc/cpuinfo | grep processor
-          git clone --depth=1 --recursive https://github.com/MaskRay/ccls
+          git clone --recursive https://github.com/MaskRay/ccls
           cd ccls
-          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
-          #cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl"
+
+          # /usr/bin/ld: cannot find -lgcc_s
+          sed 's/project(ccls LANGUAGES CXX C)/project(ccls LANGUAGES CXX)/' -i CMakeLists.txt
+
+          #cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
+          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl -Wl,--whole-archive -lpthread -Wl,--no-whole-archive"
           cmake --build Release
+
           mv Release/ccls .
           chmod a+x ./ccls
           7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
@@ -186,7 +167,7 @@ jobs:
 
   publish:
     #needs: [ubuntu2004]
-    needs: [ubuntu2004, ccls, bear, windows]
+    needs: [ubuntu2004, ccls, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -199,14 +180,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           {
-            echo "* ccls"
+            echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
-            echo "Linux: os >= ubuntu 14.04 &ensp;&ensp; glibc >= 2.17"
             echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
             echo "* MobaXterm ${{ needs.ubuntu2004.outputs.mobaxterm_ver }}"
             echo "* winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}"
-            echo "* tig ${{ needs.ubuntu2004.outputs.tig_ver }}"
-            echo "* bear nightly build"
+            echo "* tig ${{ needs.ubuntu2004.outputs.tig_ver }} static"
           } | tee /tmp/note.md
           gh release delete tools -y || true
           git push origin :tools || true

@@ -5,7 +5,6 @@
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)
 * [MobaXterm](https://mobaxterm.mobatek.net/)
 * [tig](https://github.com/jonas/tig)
-* [bear](https://github.com/rizsotto/Bear)
 * [ccls](https://github.com/MaskRay/ccls)
 * [llvm](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option
