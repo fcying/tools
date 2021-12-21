@@ -3,8 +3,8 @@ name: tools
 on:
   schedule:
   - cron: '0 18 * * *'
-  #push:
-  #  branches: [ master, test ]
+  push:
+    branches: [ master, test ]
   workflow_dispatch:
 
 env:
@@ -19,6 +19,20 @@ jobs:
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
       tig_ver: ${{ steps.tig.outputs.version }}
     steps:
+      - name: Build ctags
+        id: ctags
+        run: |
+          sudo apt-get install -y locales-all
+          sudo apt-get remove -y libxml2-dev    #static build failed
+
+          git clone https://github.com/universal-ctags/ctags
+          cd ctags
+          ./autogen.sh
+          ./configure --enable-static=yes
+          make -j
+          chmod a+x ./ctags
+          7z -mx9 a ~/tools/ctags_linux_amd64.zip ./ctags
+
       - name: Build tig
         id: tig
         run: |
@@ -186,6 +200,7 @@ jobs:
             echo "* MobaXterm ${{ needs.ubuntu2004.outputs.mobaxterm_ver }}"
             echo "* winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}"
             echo "* tig ${{ needs.ubuntu2004.outputs.tig_ver }} static"
+            echo "* ctags nightly static"
           } | tee /tmp/note.md
           gh release delete tools -y || true
           git push origin :tools || true
