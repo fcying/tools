@@ -70,6 +70,11 @@ jobs:
           7z -mx9 a ~/tools/tig_${ver}.zip ./tig
           echo "::set-output name=version::$ver"
 
+      - name: Get nvim config
+        run: |
+          mkdir -p winscp && cd $_
+          wget -qO ~/tools/nvim_config.zip https://github.com/fcying/dotvim/releases/download/nvim_config/nvim_config_with_vendor.zip
+
       - name: Get winscp
         id: winscp
         run: |
@@ -192,8 +197,10 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
+            echo "* my nvim config"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
             echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
@@ -205,3 +212,27 @@ jobs:
           gh release delete tools -y || true
           git push origin :tools || true
           gh release create tools -t "tools" -F "/tmp/note.md" --target $GITHUB_SHA ./tools/*
+
+          # push to gitee
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          eval $(ssh-agent)
+          echo "$GITEE_KEY" | ssh-add -
+          ssh-keyscan -t ed25519 gitee.com >> ~/.ssh/known_hosts
+
+          git config --global user.name "fcying"
+          git config --global user.email "fcyingmk2@gmail.com"
+
+          git clone -v git@gitee.com:fcying/tools.git gitee
+          cd gitee
+          git reset --hard init
+
+          cp ../tools/* .
+          git add .
+          git commit -m "add release"
+          git push --force
+
+          # clean
+          ssh-add -D
+          eval $(ssh-agent -k)
+

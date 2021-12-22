@@ -1,11 +1,12 @@
-#### 常用工具合集
+#### My Favorite Tools
 
 #### binary (download from releases)
+* [nvim_config](https://github.com/fcying/dotvim)
+* [tig](https://github.com/jonas/tig)
+* [universal-ctags](https://github.com/universal-ctags/ctags)
 * [winscp](https://winscp.net)
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)
 * [MobaXterm](https://mobaxterm.mobatek.net/)
-* [tig](https://github.com/jonas/tig)
-* [universal-ctags](https://github.com/universal-ctags/ctags)
 * [ccls](https://github.com/MaskRay/ccls)
 * [llvm](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option
@@ -19,5 +20,5 @@
 
 #### link
 * [ripgrep](https://github.com/BurntSushi/ripgrep)
-* [NeoVim](https://github.com/neovim/neovim/releases/latest)
+* [neovim](https://github.com/neovim/neovim)
 
