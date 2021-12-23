@@ -67,7 +67,7 @@ jobs:
           make
           cd src
           chmod a+x ./tig
-          7z -mx9 a ~/tools/tig_${ver}.zip ./tig
+          7z -mx9 a ~/tools/tig_linux_amd64.zip ./tig
           echo "::set-output name=version::$ver"
 
       - name: Get nvim config
