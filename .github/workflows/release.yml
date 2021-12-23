@@ -1,4 +1,4 @@
-name: tools
+name: release
 
 on:
   schedule:
@@ -68,21 +68,6 @@ jobs:
           cd src
           chmod a+x ./tig
           7z -mx9 a ~/tools/tig_linux_amd64.zip ./tig
-          echo "::set-output name=version::$ver"
-
-      - name: Get nvim config
-        run: |
-          mkdir -p winscp && cd $_
-          wget -qO ~/tools/nvim_config.zip https://github.com/fcying/dotvim/releases/download/nvim_config/nvim_config_with_vendor.zip
-
-      - name: Get winscp
-        id: winscp
-        run: |
-          ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
-          mkdir -p winscp && cd $_
-          wget -qOwinscp.zip https://jaist.dl.sourceforge.net/project/winscp/WinSCP/${ver}/WinSCP-${ver}-Portable.zip
-          unzip winscp.zip && rm winscp.zip
-          7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
           echo "::set-output name=version::$ver"
 
       - name: Get putty
@@ -200,7 +185,6 @@ jobs:
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
-            echo "* my nvim config"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
             echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"

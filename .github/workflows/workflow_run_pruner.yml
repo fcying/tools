@@ -53,7 +53,7 @@ jobs:
           // because we track the duration of runs over time
 
           const workflows = [
-            'tools.yml',
+            'release.yml',
             'llvm.yml',
             'workflow_run_pruner.yml'
           ]

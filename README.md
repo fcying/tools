@@ -1,7 +1,6 @@
 #### My Favorite Tools
 
 #### binary (download from releases)
-* [nvim_config](https://github.com/fcying/dotvim)
 * [tig](https://github.com/jonas/tig)
 * [universal-ctags](https://github.com/universal-ctags/ctags)
 * [winscp](https://winscp.net)
@@ -18,7 +17,14 @@
     ninja -C Release clangFormat clangFrontendTool clangIndex clangTooling clang
     ```
 
+
+#### mirror
+* [gitee](https://gitee.com/fcying/tools)
+* [ghproxy](https://ghproxy.com)
+
+
 #### link
 * [ripgrep](https://github.com/BurntSushi/ripgrep)
 * [neovim](https://github.com/neovim/neovim)
+* [nvim_config](https://github.com/fcying/dotvim)
 
