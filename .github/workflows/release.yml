@@ -60,6 +60,7 @@ jobs:
           cd -
 
           ver=$(curl -s "https://github.com/jonas/tig/releases/latest" | grep -Po "(\d+\.){2}\d+")
+          ver=2.5.4
           wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
           tar xzf tig.tgz
           cd tig-*
@@ -112,17 +113,21 @@ jobs:
           tar xJf llvm.tar.xz
           pwd && ls
           mv clang* llvm
-      - name: Build ccls
+      - name: Download ccls
         run: |
           cat /proc/cpuinfo | grep processor
+          cmake --version
+          g++ --version
           git clone --recursive https://github.com/MaskRay/ccls
+      - name: Build ccls
+        run: |
           cd ccls
 
           # /usr/bin/ld: cannot find -lgcc_s
           sed 's/project(ccls LANGUAGES CXX C)/project(ccls LANGUAGES CXX)/' -i CMakeLists.txt
 
-          #cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
-          cmake -H. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl -Wl,--whole-archive -lpthread -Wl,--no-whole-archive"
+          #cmake -S. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
+          cmake -S. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -Os -s -flto"
           cmake --build Release
 
           mv Release/ccls .
