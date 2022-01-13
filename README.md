@@ -19,7 +19,6 @@
 
 
 #### mirror
-* [gitee](https://gitee.com/fcying/tools)
 * [ghproxy](https://ghproxy.com)
 
 
