@@ -23,51 +23,67 @@ jobs:
         id: ctags
         run: |
           sudo apt-get install -y locales-all
+          #FIXME
           sudo apt-get remove -y libxml2-dev    #static build failed
 
           git clone https://github.com/universal-ctags/ctags
           cd ctags
           ./autogen.sh
-          ./configure --enable-static=yes
+          ./configure LDFLAGS="-static -L/usr/local/lib"
           make -j
           chmod a+x ./ctags
+          ./ctags --version
+          ldd ./ctags || true
           7z -mx9 a ~/tools/ctags_linux_amd64.zip ./ctags
 
       - name: Build tig
         id: tig
         run: |
-          # remove system ncurses
-          sudo apt-get remove -y libncurses-dev
-
-          # install ncursesw
+          echo "install ncursesw"
           # https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
           wget -qOncurses.tgz https://mirrors.aliyun.com/gnu/ncurses/ncurses-6.3.tar.gz
           tar xzf ncurses.tgz
           cd ncurses-*
-          ./configure --enable-widec --enable-pc-files --with-terminfo-dirs="/etc/terminfo:/lib/terminfo:/usr/share/terminfo" --without-debug --without-tests
-          make
+          ./configure --prefix=/usr/local --enable-widec --enable-pc-files --with-terminfo-dirs="/etc/terminfo:/lib/terminfo:/usr/share/terminfo" --without-debug --without-tests
+          make -j
           sudo make install
           cd -
 
-          # install readline
+          echo "install readline"
           # https://ftp.gnu.org/gnu/readline/readline-8.1.tar.gz
           wget -qOreadline.tgz https://mirrors.aliyun.com/gnu/readline/readline-8.1.tar.gz
           tar xzf readline.tgz
           cd readline-*
-          ./configure
-          make
+          ./configure --prefix=/usr/local
+          make -j
           sudo make install
           cd -
 
+          echo "install pcre2"
+          wget -qOpcre2.tgz https://sourceforge.net/projects/pcre/files/pcre2/10.37/pcre2-10.37.tar.gz
+          tar xzf pcre2.tgz
+          cd pcre2-*
+          ./configure --prefix=/usr/local \
+              --build=x86_64-linux-gnu --sysconfdir=/etc --localstatedir=/var \
+              --disable-option-checking --disable-silent-rules \
+              --disable-maintainer-mode --disable-dependency-tracking --enable-pcre2-16 --enable-pcre2-32 \
+              --disable-pcre2grep-callout
+          make -j
+          sudo make install
+          cd -
+
+          echo "build tig"
           ver=$(curl -s "https://github.com/jonas/tig/releases/latest" | grep -Po "(\d+\.){2}\d+")
-          ver=2.5.4
+          #ver=2.5.4
           wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
           tar xzf tig.tgz
           cd tig-*
-          ./configure LDFLAGS=-static
-          make
+          ./configure LDFLAGS="-static -L/usr/local/lib" CPPFLAGS="-I/usr/local/include"
+          make -j
           cd src
           chmod a+x ./tig
+          ./tig --version
+          ldd ./tig || true
           7z -mx9 a ~/tools/tig_linux_amd64.zip ./tig
           echo "::set-output name=version::$ver"
 
@@ -95,6 +111,16 @@ jobs:
           7z x MobaXterm*.zip -oMobaXterm
           mv MobaXterm/MobaXterm* MobaXterm/MobaXterm.exe
           7z -mx9 a ~/tools/MobaXterm_${ver}.zip ./MobaXterm
+          echo "::set-output name=version::$ver"
+
+      - name: Get winscp
+        id: winscp
+        run: |
+          ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
+          mkdir -p winscp && cd $_
+          wget -qOwinscp.zip https://jaist.dl.sourceforge.net/project/winscp/WinSCP/${ver}/WinSCP-${ver}-Portable.zip
+          unzip winscp.zip && rm winscp.zip
+          7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
           echo "::set-output name=version::$ver"
 
       - uses: actions/upload-artifact@v2
@@ -132,6 +158,8 @@ jobs:
 
           mv Release/ccls .
           chmod a+x ./ccls
+          ./ccls --version
+          ldd ./ccls || true
           7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
       - uses: actions/upload-artifact@v2
         with:
