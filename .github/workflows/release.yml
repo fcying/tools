@@ -19,6 +19,13 @@ jobs:
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
       tig_ver: ${{ steps.tig.outputs.version }}
     steps:
+      - name: Install xmake
+        run: |
+          ver=$(curl -s "https://github.com/xmake-io/xmake/releases/latest" | grep -Po "(\d+\.){2}\d+")
+          wget -qOxmake.deb https://github.com/xmake-io/xmake/releases/download/v$ver/xmake-v$ver.amd64.deb
+          sudo dpkg -i xmake.deb
+          xmake --version
+
       - name: Build ctags
         id: ctags
         run: |
@@ -28,15 +35,17 @@ jobs:
           wget -qOlibxml2.tgz https://github.com/GNOME/libxml2/archive/refs/tags/v2.9.12.tar.gz
           tar xzf libxml2.tgz
           cd libxml2-*
-          ./autogen.sh --prefix=/usr/local --sysconfdir=/etc --localstatedir=/var --disable-option-checking --disable-silent-rules --runstatedir=/run --disable-maintainer-mode --disable-dependency-tracking
-          make -j && sudo make install
+          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local \
+                  --sysconfdir=/etc --localstatedir=/var --runstatedir=/run \
+                  --disable-option-checking --disable-silent-rules --disable-maintainer-mode --disable-dependency-tracking"
+          sudo xmake --root
 
           echo "build ctags"
           git clone https://github.com/universal-ctags/ctags
           cd ctags
-          ./autogen.sh
-          ./configure --enable-static
-          make -j
+          xmake f --trybuild=autotools --tryconfigs="--enable-static" --cxflags="-s -Os"
+          xmake
+          cp build/artifacts/bin/ctags .
           chmod a+x ./ctags
           ./ctags --version
           ldd ./ctags || true
@@ -50,8 +59,10 @@ jobs:
           wget -qOncurses.tgz https://mirrors.aliyun.com/gnu/ncurses/ncurses-6.3.tar.gz
           tar xzf ncurses.tgz
           cd ncurses-*
-          ./configure --prefix=/usr/local --enable-widec --enable-pc-files --with-terminfo-dirs="/etc/terminfo:/lib/terminfo:/usr/share/terminfo" --without-debug --without-tests
-          make -j && sudo make install
+          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local \
+                  --enable-widec --enable-pc-files --with-terminfo-dirs='/etc/terminfo:/lib/terminfo:/usr/share/terminfo' \
+                  --without-debug --without-tests"
+          sudo xmake --root
           cd -
 
           echo "install readline"
@@ -59,20 +70,20 @@ jobs:
           wget -qOreadline.tgz https://mirrors.aliyun.com/gnu/readline/readline-8.1.tar.gz
           tar xzf readline.tgz
           cd readline-*
-          ./configure --prefix=/usr/local
-          make -j && sudo make install
+          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local"
+          sudo xmake --root
           cd -
 
           echo "install pcre2"
           wget -qOpcre2.tgz https://jaist.dl.sourceforge.net/project/pcre/pcre2/10.37/pcre2-10.37.tar.gz
           tar xzf pcre2.tgz
           cd pcre2-*
-          ./configure --prefix=/usr/local \
+          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local \
               --build=x86_64-linux-gnu --sysconfdir=/etc --localstatedir=/var \
               --disable-option-checking --disable-silent-rules \
               --disable-maintainer-mode --disable-dependency-tracking --enable-pcre2-16 --enable-pcre2-32 \
-              --disable-pcre2grep-callout
-          make -j && sudo make install
+              --disable-pcre2grep-callout"
+          sudo xmake --root
           cd -
 
           echo "build tig"
@@ -81,9 +92,9 @@ jobs:
           wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
           tar xzf tig.tgz
           cd tig-*
-          ./configure LDFLAGS="-static -L/usr/local/lib" CPPFLAGS="-I/usr/local/include"
-          make -j
-          cd src
+          xmake f --trybuild=autotools --cxflags="-I/usr/local/include" --ldflags="-static -L/usr/local/lib"
+          xmake
+          cp build/artifacts/bin/tig .
           chmod a+x ./tig
           ./tig --version
           ldd ./tig || true
@@ -144,6 +155,11 @@ jobs:
           mv clang* llvm
       - name: Download ccls
         run: |
+          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-linux.zip
+          7z x ninja.zip
+          sudo mv ninja /usr/local/bin
+          ninja --version
+
           cat /proc/cpuinfo | grep processor
           cmake --version
           g++ --version
@@ -156,8 +172,8 @@ jobs:
           sed 's/project(ccls LANGUAGES CXX C)/project(ccls LANGUAGES CXX)/' -i CMakeLists.txt
 
           #cmake -S. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
-          cmake -S. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -Os -s -flto"
-          cmake --build Release
+          cmake -S. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -Os -s -flto"
+          ninja -C Release
 
           mv Release/ccls .
           chmod a+x ./ccls
@@ -189,9 +205,10 @@ jobs:
         run: |
           git clone --depth=1 --recursive https://github.com/MaskRay/ccls
           cd ccls
-          cmake -H. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH="c:/llvm/Release"
+          cmake -H. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH="c:/llvm/Release"
           ninja -C Release
 
+          .\Release\ccls.exe --version
           mkdir ccls
           copy Release\ccls.exe .\ccls\
           copy c:\Windows\System32\vcruntime140_1.dll .\ccls\
