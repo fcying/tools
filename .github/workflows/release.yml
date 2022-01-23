@@ -9,6 +9,7 @@ on:
 
 env:
   llvm_ver: 12.0.1
+  ninja_ver: 1.10.2
 
 jobs:
   ubuntu2004:
@@ -21,6 +22,8 @@ jobs:
     steps:
       - name: Install xmake
         run: |
+          mkdir -p ~/tools
+
           ver=$(curl -s "https://github.com/xmake-io/xmake/releases/latest" | grep -Po "(\d+\.){2}\d+")
           wget -qOxmake.deb https://github.com/xmake-io/xmake/releases/download/v$ver/xmake-v$ver.amd64.deb
           sudo dpkg -i xmake.deb
@@ -49,7 +52,7 @@ jobs:
           chmod a+x ./ctags
           ./ctags --version
           ldd ./ctags || true
-          7z -mx9 a ~/tools/ctags_linux_amd64.zip ./ctags
+          XZ_OPT=-9 tar cJvf ~/tools/ctags_linux_amd64.txz ctags
 
       - name: Build tig
         id: tig
@@ -98,7 +101,7 @@ jobs:
           chmod a+x ./tig
           ./tig --version
           ldd ./tig || true
-          7z -mx9 a ~/tools/tig_linux_amd64.zip ./tig
+          XZ_OPT=-9 tar cJvf ~/tools/tig_linux_amd64.txz tig
           echo "::set-output name=version::$ver"
 
       - name: Get putty
@@ -143,6 +146,80 @@ jobs:
           path: ~/tools
           retention-days: 1
 
+  clangd:
+    runs-on: ubuntu-20.04
+    outputs:
+      clangd_ver: ${{ steps.clangd.outputs.version }}
+    steps:
+      - name: Init env
+        run: |
+          mkdir -p ~/tools
+
+          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ninja_ver}/ninja-linux.zip
+          7z x ninja.zip
+          sudo mv ninja /usr/local/bin
+          ninja --version
+
+          sudo apt-get install -y libz-dev libc-ares-dev
+          clang++ --version
+
+      - name: Build clangd with rpath
+        id: clangd
+        run: |
+          ver=$(curl -s "https://github.com/llvm/llvm-project/releases/latest" | grep -Po "(\d+\.){2}\d+")
+          echo "::set-output name=version::$ver"
+
+          #src_link="https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/llvm-project-$ver.src.tar.gz"
+          #last_version=$(curl -s https://github.com/llvm/llvm-project/tags | grep -Po "llvmorg-.*(?=\.tar\.gz)" | head -1)
+          #src_link="https://github.com/llvm/llvm-project/archive/refs/tags/$last_version.tar.gz"
+          #echo "::set-output name=version::$last_version"
+
+          #wget -qOllvm.tgz $src_link
+          #tar xzf llvm.tgz
+          #cd llvm-project-*
+
+          git clone https://github.com/llvm/llvm-project --depth 1
+          cd llvm-project
+
+          cmake -S llvm -B Release -G Ninja \
+                -DLLVM_TARGETS_TO_BUILD="X86" \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_ENABLE_ASSERTIONS=OFF \
+                -DLLVM_ENABLE_BACKTRACES=ON \
+                -DLLVM_ENABLE_TERMINFO=OFF \
+                -DCLANG_PLUGIN_SUPPORT=OFF \
+                -DLLVM_ENABLE_PLUGINS=OFF \
+                -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
+                -DLLVM_ENABLE_ZLIB=OFF \
+                -DCMAKE_C_COMPILER=clang \
+                -DCMAKE_CXX_COMPILER=clang++ \
+                -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
+                -DCMAKE_C_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
+                -DCMAKE_CXX_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
+                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=."
+
+          ninja -C Release clangd
+          ldd Release/bin/clangd && du -h $_ && chmod +x $_
+
+          mkdir -p bin lib/clang
+          mv Release/bin/clangd lib/clang/
+          ldd lib/clang/clangd | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
+          ldd lib/clang/clangd | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
+          {
+            echo "#!/usr/bin/env bash"
+            echo 'cd "$(dirname $0)/../lib/clang"'
+            echo 'exec ./ld.so ./clangd $@'
+          } > bin/clangd
+          chmod +x bin/clangd
+
+          mkdir clangd_$ver && mv bin lib $_
+          XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd_$ver
+      - uses: actions/upload-artifact@v2
+        with:
+          name: tools
+          path: ~/tools
+          retention-days: 1
+
   ccls:
     runs-on: ubuntu-20.04
     steps:
@@ -155,7 +232,7 @@ jobs:
           mv clang* llvm
       - name: Download ccls
         run: |
-          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-linux.zip
+          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ninja_ver}/ninja-linux.zip
           7z x ninja.zip
           sudo mv ninja /usr/local/bin
           ninja --version
@@ -179,7 +256,7 @@ jobs:
           chmod a+x ./ccls
           ./ccls --version
           ldd ./ccls || true
-          7z -mx9 a ~/tools/ccls_linux_amd64.zip ./ccls
+          XZ_OPT=-9 tar cJvf ~/tools/ccls_linux_amd64.txz ccls
       - uses: actions/upload-artifact@v2
         with:
           name: tools
@@ -224,7 +301,7 @@ jobs:
 
   publish:
     #needs: [ubuntu2004]
-    needs: [ubuntu2004, ccls, windows]
+    needs: [ubuntu2004, clangd, ccls, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -238,6 +315,8 @@ jobs:
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
+            #echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} with rpath lib"
+            echo "* clangd nightly with rpath lib"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
             echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
