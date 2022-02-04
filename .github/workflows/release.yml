@@ -166,16 +166,10 @@ jobs:
       - name: Build clangd with rpath
         id: clangd
         run: |
-          ver=$(curl -s "https://github.com/llvm/llvm-project/releases/latest" | grep -Po "(\d+\.){2}\d+")
-          echo "::set-output name=version::$ver"
-
-          #src_link="https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/llvm-project-$ver.src.tar.gz"
-          #last_version=$(curl -s https://github.com/llvm/llvm-project/tags | grep -Po "llvmorg-.*(?=\.tar\.gz)" | head -1)
-          #src_link="https://github.com/llvm/llvm-project/archive/refs/tags/$last_version.tar.gz"
-          #echo "::set-output name=version::$last_version"
-
-          #wget -qOllvm.tgz $src_link
-          #tar xzf llvm.tgz
+          #ver=$(curl -s "https://github.com/llvm/llvm-project/releases/latest" | grep -Po "(\d+\.){2}\d+")
+          #src_link="https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/llvm-project-$ver.src.tar.xz"
+          #wget -qOllvm.txz $src_link
+          #tar xJf llvm.txz
           #cd llvm-project-*
 
           git clone https://github.com/llvm/llvm-project --depth 1
@@ -211,6 +205,9 @@ jobs:
             echo 'exec ./ld.so ./clangd $@'
           } > bin/clangd
           chmod +x bin/clangd
+
+          ver=$(./bin/clangd --version | grep -Po "\d+\.\d+\.\d+")
+          echo "::set-output name=version::$ver"
 
           mkdir clangd_$ver && mv bin lib $_
           XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd_$ver
@@ -315,8 +312,7 @@ jobs:
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
-            #echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} with rpath lib"
-            echo "* clangd nightly with rpath lib"
+            echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} nightly with rpath lib"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
             echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
