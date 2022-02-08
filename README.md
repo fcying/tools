@@ -11,7 +11,7 @@
 * [llvm](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option
     ```
-    VC++ compiler toolset version: 14.16
+    VC++ compiler toolset version: 14.29
 
     cd /d c:\llvm
     cmake -Hllvm -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_PROJECTS=clang

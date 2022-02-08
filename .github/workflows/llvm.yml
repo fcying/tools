@@ -25,7 +25,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64
-          toolset: 14.16
+          toolset: 14.29
 
       - uses: olegtarasov/get-tag@v2.1.1
         id: tagName
@@ -83,7 +83,7 @@ jobs:
         run: |
           {
             echo "llvm version: ${{ needs.windows.outputs.version }}"
-            echo "VC++ compiler toolset version: 14.16"
+            echo "VC++ compiler toolset version: 14.29"
           } | tee /tmp/note.md
           tag_name=llvm-${{ needs.windows.outputs.version }}
           if [ "${{ needs.windows.outputs.version }}" == "latest" ]; then
