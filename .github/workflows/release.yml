@@ -32,6 +32,7 @@ jobs:
       - name: Build ctags
         id: ctags
         run: |
+          sudo apt-get update
           sudo apt-get install -y locales-all
 
           echo "install libxml2"
@@ -160,6 +161,7 @@ jobs:
           sudo mv ninja /usr/local/bin
           ninja --version
 
+          sudo apt-get update
           sudo apt-get install -y libz-dev libc-ares-dev
           clang++ --version
 
