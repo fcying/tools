@@ -24,7 +24,7 @@ jobs:
         run: |
           mkdir -p ~/tools
 
-          ver=$(curl -s "https://github.com/xmake-io/xmake/releases/latest" | grep -Po "(\d+\.){2}\d+")
+          ver=$(curl -sv "https://github.com/xmake-io/xmake/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
           wget -qOxmake.deb https://github.com/xmake-io/xmake/releases/download/v$ver/xmake-v$ver.amd64.deb
           sudo dpkg -i xmake.deb
           xmake --version
@@ -91,7 +91,7 @@ jobs:
           cd -
 
           echo "build tig"
-          ver=$(curl -s "https://github.com/jonas/tig/releases/latest" | grep -Po "(\d+\.){2}\d+")
+          ver=$(curl -sv "https://github.com/jonas/tig/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
           #ver=2.5.4
           wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
           tar xzf tig.tgz
