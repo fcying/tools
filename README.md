@@ -8,6 +8,7 @@
 * [MobaXterm](https://mobaxterm.mobatek.net/)
 * [ccls](https://github.com/MaskRay/ccls)
 * [clangd](https://github.com/clangd/clangd)
+* [openjdk](https://openjdk.java.net)
 * [llvm](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option
     ```
