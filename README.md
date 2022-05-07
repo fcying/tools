@@ -8,6 +8,7 @@
 * [MobaXterm](https://mobaxterm.mobatek.net/)
 * [ccls](https://github.com/MaskRay/ccls)
 * [clangd](https://github.com/clangd/clangd)
+* [openjdk](https://openjdk.java.net)
 * [llvm](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option
     ```
@@ -27,4 +28,16 @@
 * [ripgrep](https://github.com/BurntSushi/ripgrep)
 * [neovim](https://github.com/neovim/neovim)
 * [nvim_config](https://github.com/fcying/dotvim)
+
+#### openjdk-7 build options
+```
+os: ubuntu 14.04
+apt-get update
+apt-get install -y openjdk-7-jdk build-essential wget ant zip fastjar gawk cpio xsltproc libcups2-dev libfreetype6-dev libfontconfig1-dev libasound2-dev libpcsclite-dev libsctp-dev libxinerama-dev libxcomposite-dev libxrender-dev libxtst-dev
+wget -Ojdk7.tgz https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/openjdk-7/7u211-2.6.17-0ubuntu0.1/openjdk-7_7u211-2.6.17.orig.tar.gz
+tar xzvf jdk7.tgz
+cd openjdk*
+./configure --prefix=/opt/jdk_1.7.0_201 --with-jdk-home=/usr/lib/jvm/java-7-openjdk-amd64 --disable-tests --disable-docs --disable-bootstrap --disable-bootstrap-tools --without-rhino --disable-system-kerberos --disable-system-jpeg --disable-system-png --disable-system-gif --disable-system-lcms --disable-system-gtk --disable-system-gio --disable-system-gconf --disable-compile-against-syscalls
+make -j && make install
+```
 
