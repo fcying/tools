@@ -12,7 +12,7 @@ env:
   ninja_ver: 1.10.2
 
 jobs:
-  ubuntu2004:
+  ubuntu:
     runs-on: ubuntu-20.04
     outputs:
       winscp_ver: ${{ steps.winscp.outputs.version }}
@@ -20,19 +20,30 @@ jobs:
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
       tig_ver: ${{ steps.tig.outputs.version }}
     steps:
-      - name: Install xmake
+      -
+        name: Install makedeb && build tap
+        id: tap
         run: |
           mkdir -p ~/tools
-
+          sudo apt-get update
+          ver=$(curl -sv "https://github.com/makedeb/makedeb/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
+          wget -Ofile.deb "${cdn}https://proget.hunterwittenborn.com/debian-feeds/makedeb/main/makedeb/all/makedeb_all_${ver}-stable.deb"
+          sudo apt install -y ./file.deb
+          git clone 'https://mpr.hunterwittenborn.com/tap'
+          cd tap
+          makedeb -s --no-confirm
+          mv tap*.deb ~/tools/tap_amd64.deb
+      -
+        name: Install xmake
+        run: |
           ver=$(curl -sv "https://github.com/xmake-io/xmake/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
           wget -qOxmake.deb https://github.com/xmake-io/xmake/releases/download/v$ver/xmake-v$ver.amd64.deb
           sudo dpkg -i xmake.deb
           xmake --version
-
-      - name: Build ctags
+      -
+        name: Build ctags
         id: ctags
         run: |
-          sudo apt-get update
           sudo apt-get install -y locales-all
 
           echo "install libxml2"
@@ -54,8 +65,8 @@ jobs:
           ./ctags --version
           ldd ./ctags || true
           XZ_OPT=-9 tar cJvf ~/tools/ctags_linux_amd64.txz ctags
-
-      - name: Build tig
+      -
+        name: Build tig
         id: tig
         run: |
           echo "install ncursesw"
@@ -104,8 +115,8 @@ jobs:
           ldd ./tig || true
           XZ_OPT=-9 tar cJvf ~/tools/tig_linux_amd64.txz tig
           echo "::set-output name=version::$ver"
-
-      - name: Get putty
+      -
+        name: Get putty
         id: putty
         run: |
           ver=$(curl -s "https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html" | grep -Po "(?<=latest release \()\d\.\d+" | head -1)
@@ -119,8 +130,8 @@ jobs:
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttygen.exe
           7z -mx9 a ~/tools/putty_${ver}.zip ../putty
           echo "::set-output name=version::$ver"
-
-      - name: Get MobaXterm
+      -
+        name: Get MobaXterm
         id: mobaxterm
         run: |
           moba_link=$(curl -s https://mobaxterm.mobatek.net/download-home-edition.html | grep -Po "https:.*?Portable.*?\.zip" | head -1)
@@ -130,8 +141,8 @@ jobs:
           mv MobaXterm/MobaXterm* MobaXterm/MobaXterm.exe
           7z -mx9 a ~/tools/MobaXterm_${ver}.zip ./MobaXterm
           echo "::set-output name=version::$ver"
-
-      - name: Get winscp
+      -
+        name: Get winscp
         id: winscp
         run: |
           ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
@@ -140,8 +151,8 @@ jobs:
           unzip winscp.zip && rm winscp.zip
           7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
           echo "::set-output name=version::$ver"
-
-      - uses: actions/upload-artifact@v2
+      -
+        uses: actions/upload-artifact@v2
         with:
           name: tools
           path: ~/tools
@@ -299,8 +310,8 @@ jobs:
           retention-days: 1
 
   publish:
-    #needs: [ubuntu2004]
-    needs: [ubuntu2004, clangd, ccls, windows]
+    #needs: [ubuntu]
+    needs: [ubuntu, clangd, ccls, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -317,11 +328,12 @@ jobs:
             echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} nightly with rpath lib"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
-            echo "* putty ${{ needs.ubuntu2004.outputs.putty_ver }}"
-            echo "* MobaXterm ${{ needs.ubuntu2004.outputs.mobaxterm_ver }}"
-            echo "* winscp ${{ needs.ubuntu2004.outputs.winscp_ver }}"
-            echo "* tig ${{ needs.ubuntu2004.outputs.tig_ver }} static"
+            echo "* putty ${{ needs.ubuntu.outputs.putty_ver }}"
+            echo "* MobaXterm ${{ needs.ubuntu.outputs.mobaxterm_ver }}"
+            echo "* winscp ${{ needs.ubuntu.outputs.winscp_ver }}"
+            echo "* tig ${{ needs.ubuntu.outputs.tig_ver }} static"
             echo "* ctags nightly static"
+            echo "* tap nightly"
           } | tee /tmp/note.md
           gh release delete tools -y || true
           git push origin :tools || true
