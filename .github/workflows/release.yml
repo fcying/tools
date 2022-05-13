@@ -29,8 +29,9 @@ jobs:
           ver=$(curl -sv "https://github.com/makedeb/makedeb/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
           wget -Ofile.deb "${cdn}https://proget.hunterwittenborn.com/debian-feeds/makedeb/main/makedeb/all/makedeb_all_${ver}-stable.deb"
           sudo apt install -y ./file.deb
-          git clone 'https://mpr.hunterwittenborn.com/tap'
+          git clone https://mpr.makedeb.org/tap.git
           cd tap
+          sudo apt install -y asciidoctor ruby-asciidoctor
           makedeb -s --no-confirm
           mv tap*.deb ~/tools/tap_amd64.deb
       -
@@ -38,15 +39,27 @@ jobs:
         run: |
           ver=$(curl -sv "https://github.com/xmake-io/xmake/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
           wget -qOxmake.deb https://github.com/xmake-io/xmake/releases/download/v$ver/xmake-v$ver.amd64.deb
-          sudo dpkg -i xmake.deb
+          sudo apt install -y ./xmake.deb
           xmake --version
+      -
+        name: Build make 3.82
+        run: |
+          wget -qOmake.tgz https://ftp.gnu.org/gnu/make/make-3.82.tar.gz
+          tar xzvf make.tgz
+          cd make-3.82
+          sed -i 's/# if _GNU_GLOB_INTERFACE_VERSION == GLOB_INTERFACE_VERSION/# if _GNU_GLOB_INTERFACE_VERSION >= GLOB_INTERFACE_VERSION/' glob/glob.c
+          ./configure --prefix=/opt/make_3.8.2
+          make -j && make install
+          cd /opt/make_3.8.2/bin
+          ./make --version
+          XZ_OPT=-9 tar cJvf ~/tools/make_3.8.2_linux_amd64.txz /opt/make_3.8.2
       -
         name: Build ctags
         id: ctags
         run: |
           sudo apt-get install -y locales-all
 
-          echo "install libxml2"
+          echo "install libxml2 2.9.12"
           wget -qOlibxml2.tgz https://github.com/GNOME/libxml2/archive/refs/tags/v2.9.12.tar.gz
           tar xzf libxml2.tgz
           cd libxml2-*
@@ -55,7 +68,7 @@ jobs:
                   --disable-option-checking --disable-silent-rules --disable-maintainer-mode --disable-dependency-tracking"
           sudo xmake --root
 
-          echo "build ctags"
+          echo "build ctags latest"
           git clone https://github.com/universal-ctags/ctags
           cd ctags
           xmake f --trybuild=autotools --tryconfigs="--enable-static" --cxflags="-s -Os"
@@ -69,7 +82,7 @@ jobs:
         name: Build tig
         id: tig
         run: |
-          echo "install ncursesw"
+          echo "install ncursesw 6.3"
           # https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
           wget -qOncurses.tgz https://mirrors.aliyun.com/gnu/ncurses/ncurses-6.3.tar.gz
           tar xzf ncurses.tgz
@@ -80,7 +93,7 @@ jobs:
           sudo xmake --root
           cd -
 
-          echo "install readline"
+          echo "install readline 8.1"
           # https://ftp.gnu.org/gnu/readline/readline-8.1.tar.gz
           wget -qOreadline.tgz https://mirrors.aliyun.com/gnu/readline/readline-8.1.tar.gz
           tar xzf readline.tgz
@@ -89,8 +102,9 @@ jobs:
           sudo xmake --root
           cd -
 
-          echo "install pcre2"
-          wget -qOpcre2.tgz https://jaist.dl.sourceforge.net/project/pcre/pcre2/10.37/pcre2-10.37.tar.gz
+          ver=$(curl -sv "https://github.com/PCRE2Project/pcre2/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+")
+          echo "install pcre2 $ver"
+          wget -qOpcre2.tgz https://github.com/PCRE2Project/pcre2/releases/download/pcre2-$ver/pcre2-$ver.tar.gz
           tar xzf pcre2.tgz
           cd pcre2-*
           xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local \
@@ -101,7 +115,7 @@ jobs:
           sudo xmake --root
           cd -
 
-          echo "build tig"
+          echo "build tig latest release"
           ver=$(curl -sv "https://github.com/jonas/tig/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
           #ver=2.5.4
           wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
@@ -147,7 +161,8 @@ jobs:
         run: |
           ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
           mkdir -p winscp && cd $_
-          wget -qOwinscp.zip https://jaist.dl.sourceforge.net/project/winscp/WinSCP/${ver}/WinSCP-${ver}-Portable.zip
+          wget -qOwinscp.zip https://winscp.net/download/WinSCP-${ver}-Portable.zip
+
           unzip winscp.zip && rm winscp.zip
           7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
           echo "::set-output name=version::$ver"
@@ -189,24 +204,24 @@ jobs:
           cd llvm-project
 
           cmake -S llvm -B Release -G Ninja \
-                -DLLVM_TARGETS_TO_BUILD="X86" \
+                -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
                 -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_TARGETS_TO_BUILD="X86" \
                 -DLLVM_ENABLE_ASSERTIONS=OFF \
                 -DLLVM_ENABLE_BACKTRACES=ON \
                 -DLLVM_ENABLE_TERMINFO=OFF \
                 -DCLANG_PLUGIN_SUPPORT=OFF \
                 -DLLVM_ENABLE_PLUGINS=OFF \
-                -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
-                -DLLVM_ENABLE_ZLIB=OFF \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
-                -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
                 -DCMAKE_C_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
                 -DCMAKE_CXX_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
-                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=."
+                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=." \
+                -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
+                -DLLVM_ENABLE_ZLIB=FORCE_ON
 
           ninja -C Release clangd
-          ldd Release/bin/clangd && du -h $_ && chmod +x $_
+          ldd Release/bin/clangd && du -b $_ && chmod +x $_
 
           mkdir -p bin lib/clang
           mv Release/bin/clangd lib/clang/
@@ -334,6 +349,7 @@ jobs:
             echo "* tig ${{ needs.ubuntu.outputs.tig_ver }} static"
             echo "* ctags nightly static"
             echo "* tap nightly"
+            echo "* make 3.8.2"
           } | tee /tmp/note.md
           gh release delete tools -y || true
           git push origin :tools || true
