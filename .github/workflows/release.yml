@@ -222,7 +222,6 @@ jobs:
 
           ninja -C Release clangd
           ldd Release/bin/clangd && du -b $_ && chmod +x $_
-
           mkdir -p bin lib/clang
           mv Release/bin/clangd lib/clang/
           ldd lib/clang/clangd | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
@@ -239,6 +238,22 @@ jobs:
 
           mkdir clangd_$ver && mv bin lib $_
           XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd_$ver
+
+          ninja -C Release clang-format
+          ldd Release/bin/clang-format && du -b $_ && chmod +x $_
+          mkdir -p bin lib/clang
+          mv Release/bin/clang-format lib/clang/
+          ldd lib/clang/clang-format | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
+          ldd lib/clang/clang-format | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
+          {
+            echo "#!/usr/bin/env bash"
+            echo 'cd "$(dirname $0)/../lib/clang"'
+            echo 'exec ./ld.so ./clang-format $@'
+          } > bin/clang-format
+          chmod +x bin/clang-format
+          mkdir clang_format_$ver && mv bin lib $_
+          XZ_OPT=-9 tar cJvf ~/tools/clang_format_linux_amd64.txz clang_format_$ver
+
       - uses: actions/upload-artifact@v2
         with:
           name: tools
@@ -341,6 +356,7 @@ jobs:
         run: |
           {
             echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} nightly with rpath lib"
+            echo "* clang-format ${{ needs.clangd.outputs.clangd_ver }} nightly with rpath lib"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
             echo "* putty ${{ needs.ubuntu.outputs.putty_ver }}"
@@ -354,31 +370,3 @@ jobs:
           gh release delete tools -y || true
           git push origin :tools || true
           gh release create tools -t "tools" -F "/tmp/note.md" --target $GITHUB_SHA ./tools/*
-
-          ## push to gitee
-          #mkdir -p ~/.ssh
-          #chmod 700 ~/.ssh
-          #eval $(ssh-agent)
-          #echo "$GITEE_KEY" | ssh-add -
-          #ssh-keyscan -t ed25519 gitee.com >> ~/.ssh/known_hosts
-          #
-          #git config --global user.name "fcying"
-          #git config --global user.email "fcyingmk2@gmail.com"
-          #
-          #git clone -v git@gitee.com:fcying/tools.git gitee
-          #cd gitee
-          #git reset --hard init
-          #
-          #cp ../tools/* .
-          #git add .
-          #git commit -m "add release"
-          #
-          #git reflog expire --expire-unreachable=now --all
-          #git gc --prune=now
-          #
-          #git push --force --all
-          #
-          ## clean
-          #ssh-add -D
-          #eval $(ssh-agent -k)
-
