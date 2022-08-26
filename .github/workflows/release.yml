@@ -204,7 +204,6 @@ jobs:
           cd llvm-project
 
           cmake -S llvm -B Release -G Ninja \
-                -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DLLVM_TARGETS_TO_BUILD="X86" \
                 -DLLVM_ENABLE_ASSERTIONS=OFF \
@@ -212,24 +211,26 @@ jobs:
                 -DLLVM_ENABLE_TERMINFO=OFF \
                 -DCLANG_PLUGIN_SUPPORT=OFF \
                 -DLLVM_ENABLE_PLUGINS=OFF \
+                -DLLVM_ENABLE_ZLIB=FORCE_ON \
+                -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
+                -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
                 -DCMAKE_C_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
                 -DCMAKE_CXX_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
-                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=." \
-                -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
-                -DLLVM_ENABLE_ZLIB=FORCE_ON
+                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang"
 
           ninja -C Release clangd
           ldd Release/bin/clangd && du -b $_ && chmod +x $_
-          mkdir -p bin lib/clang
-          mv Release/bin/clangd lib/clang/
-          ldd lib/clang/clangd | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
-          ldd lib/clang/clangd | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
+          mkdir bin lib
+          cp Release/bin/clangd bin/clangd_origin
+          cp -r Release/lib/clang lib/
+          ldd bin/clangd_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} bin/ld.so
+          ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
           {
             echo "#!/usr/bin/env bash"
-            echo 'cd "$(dirname $0)/../lib/clang"'
-            echo 'exec ./ld.so ./clangd $@'
+            echo 'cd "$(dirname $0)"'
+            echo 'exec ./ld.so ./clangd_origin $@'
           } > bin/clangd
           chmod +x bin/clangd
 
