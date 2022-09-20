@@ -19,13 +19,19 @@ jobs:
       putty_ver: ${{ steps.putty.outputs.version }}
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
       tig_ver: ${{ steps.tig.outputs.version }}
+    env:
+      WINSCP_VER: ${{ secrets.WINSCP_VER }}
     steps:
+      -
+        name: Init Env
+        run: |
+          sudo apt-get update
+          sudo apt install -y automake
       -
         name: Install makedeb && build tap
         id: tap
         run: |
           mkdir -p ~/tools
-          sudo apt-get update
           ver=$(curl -sv "https://github.com/makedeb/makedeb/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
           wget -Ofile.deb "${cdn}https://proget.hunterwittenborn.com/debian-feeds/makedeb/main/makedeb/all/makedeb_all_${ver}-stable.deb"
           sudo apt install -y ./file.deb
@@ -63,15 +69,17 @@ jobs:
           wget -qOlibxml2.tgz https://github.com/GNOME/libxml2/archive/refs/tags/v2.9.12.tar.gz
           tar xzf libxml2.tgz
           cd libxml2-*
-          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local \
+          echo "xmake 1"
+          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local \
                   --sysconfdir=/etc --localstatedir=/var --runstatedir=/run \
                   --disable-option-checking --disable-silent-rules --disable-maintainer-mode --disable-dependency-tracking"
+          echo "xmake 2"
           sudo xmake --root
 
           echo "build ctags latest"
           git clone https://github.com/universal-ctags/ctags
           cd ctags
-          xmake f --trybuild=autotools --tryconfigs="--enable-static" --cxflags="-s -Os"
+          xmake f --trybuild=autoconf --tryconfigs="--enable-static" --cxflags="-s -Os"
           xmake
           cp build/artifacts/bin/ctags .
           chmod a+x ./ctags
@@ -87,7 +95,7 @@ jobs:
           wget -qOncurses.tgz https://mirrors.aliyun.com/gnu/ncurses/ncurses-6.3.tar.gz
           tar xzf ncurses.tgz
           cd ncurses-*
-          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local \
+          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local \
                   --enable-widec --enable-pc-files --with-terminfo-dirs='/etc/terminfo:/lib/terminfo:/usr/share/terminfo' \
                   --without-debug --without-tests"
           sudo xmake --root
@@ -98,7 +106,7 @@ jobs:
           wget -qOreadline.tgz https://mirrors.aliyun.com/gnu/readline/readline-8.1.tar.gz
           tar xzf readline.tgz
           cd readline-*
-          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local"
+          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local"
           sudo xmake --root
           cd -
 
@@ -107,7 +115,7 @@ jobs:
           wget -qOpcre2.tgz https://github.com/PCRE2Project/pcre2/releases/download/pcre2-$ver/pcre2-$ver.tar.gz
           tar xzf pcre2.tgz
           cd pcre2-*
-          xmake f --trybuild=autotools --tryconfigs="--prefix=/usr/local \
+          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local \
               --build=x86_64-linux-gnu --sysconfdir=/etc --localstatedir=/var \
               --disable-option-checking --disable-silent-rules \
               --disable-maintainer-mode --disable-dependency-tracking --enable-pcre2-16 --enable-pcre2-32 \
@@ -121,7 +129,7 @@ jobs:
           wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
           tar xzf tig.tgz
           cd tig-*
-          xmake f --trybuild=autotools --cxflags="-I/usr/local/include" --ldflags="-static -L/usr/local/lib"
+          xmake f --trybuild=autoconf --cxflags="-I/usr/local/include" --ldflags="-static -L/usr/local/lib"
           xmake
           cp build/artifacts/bin/tig .
           chmod a+x ./tig
@@ -161,8 +169,12 @@ jobs:
         run: |
           ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
           mkdir -p winscp && cd $_
-          wget -qOwinscp.zip https://winscp.net/download/WinSCP-${ver}-Portable.zip
 
+          if [ "$WINSCP_VER" != "0" ]; then
+              ver=$WINSCP_VER
+          fi
+
+          wget -Owinscp.zip https://winscp.net/download/WinSCP-${ver}-Portable.zip
           unzip winscp.zip && rm winscp.zip
           7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
           echo "::set-output name=version::$ver"
