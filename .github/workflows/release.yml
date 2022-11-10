@@ -241,7 +241,7 @@ jobs:
           ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
           {
             echo "#!/usr/bin/env bash"
-            echo 'cd "$(dirname $0)"'
+            echo 'cd "$(dirname $(readlink -f $0))"'
             echo 'exec ./ld.so ./clangd_origin $@'
           } > bin/clangd
           chmod +x bin/clangd
@@ -249,8 +249,10 @@ jobs:
           ver=$(./bin/clangd --version | grep -Po "\d+\.\d+\.\d+")
           echo "::set-output name=version::$ver"
 
-          mkdir clangd_$ver && mv bin lib $_
-          XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd_$ver
+          #mkdir clangd_$ver && mv bin lib $_
+          #XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd_$ver
+          mkdir clangd && mv bin lib $_
+          XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd
 
           ninja -C Release clang-format
           ldd Release/bin/clang-format && du -b $_ && chmod +x $_
@@ -260,7 +262,7 @@ jobs:
           ldd lib/clang/clang-format | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
           {
             echo "#!/usr/bin/env bash"
-            echo 'cd "$(dirname $0)/../lib/clang"'
+            echo 'cd "$(dirname $(readlink -f $0))/../lib/clang"'
             echo 'exec ./ld.so ./clang-format $@'
           } > bin/clang-format
           chmod +x bin/clang-format
