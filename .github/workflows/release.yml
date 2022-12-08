@@ -129,9 +129,10 @@ jobs:
           wget -qOtig.tgz https://github.com/jonas/tig/releases/download/tig-$ver/tig-$ver.tar.gz
           tar xzf tig.tgz
           cd tig-*
-          xmake f --trybuild=autoconf --cxflags="-I/usr/local/include" --ldflags="-static -L/usr/local/lib"
-          xmake
-          cp build/artifacts/bin/tig .
+          ./autogen.sh
+          ./configure LIBS=-pthread LDFLAGS="-static -L/usr/local/lib" CPPFLAGS="-I/usr/local/include"
+          make -j
+          cp src/tig .
           chmod a+x ./tig
           ./tig --version
           ldd ./tig || true
