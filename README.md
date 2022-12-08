@@ -2,7 +2,6 @@
 
 #### binary (download from releases)
 * [tig](https://github.com/jonas/tig)
-* [tap](https://github.com/hwittenborn/tap)
 * [universal-ctags](https://github.com/universal-ctags/ctags)
 * [winscp](https://winscp.net)
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)

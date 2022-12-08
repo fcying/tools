@@ -27,19 +27,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt install -y automake
-      -
-        name: Install makedeb && build tap
-        id: tap
-        run: |
           mkdir -p ~/tools
-          ver=$(curl -sv "https://github.com/makedeb/makedeb/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
-          wget -Ofile.deb "${cdn}https://proget.hunterwittenborn.com/debian-feeds/makedeb/main/makedeb/all/makedeb_all_${ver}-stable.deb"
-          sudo apt install -y ./file.deb
-          git clone https://mpr.makedeb.org/tap.git
-          cd tap
-          sudo apt install -y asciidoctor ruby-asciidoctor
-          makedeb -s --no-confirm
-          mv tap*.deb ~/tools/tap_amd64.deb
       -
         name: Install xmake
         run: |
@@ -69,11 +57,9 @@ jobs:
           wget -qOlibxml2.tgz https://github.com/GNOME/libxml2/archive/refs/tags/v2.9.12.tar.gz
           tar xzf libxml2.tgz
           cd libxml2-*
-          echo "xmake 1"
           xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local \
                   --sysconfdir=/etc --localstatedir=/var --runstatedir=/run \
                   --disable-option-checking --disable-silent-rules --disable-maintainer-mode --disable-dependency-tracking"
-          echo "xmake 2"
           sudo xmake --root
 
           echo "build ctags latest"
@@ -137,7 +123,7 @@ jobs:
           ./tig --version
           ldd ./tig || true
           XZ_OPT=-9 tar cJvf ~/tools/tig_linux_amd64.txz tig
-          echo "::set-output name=version::$ver"
+          echo "version=$ver" >> $GITHUB_OUTPUT
       -
         name: Get putty
         id: putty
@@ -152,7 +138,7 @@ jobs:
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pageant.exe
           wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttygen.exe
           7z -mx9 a ~/tools/putty_${ver}.zip ../putty
-          echo "::set-output name=version::$ver"
+          echo "version=$ver" >> $GITHUB_OUTPUT
       -
         name: Get MobaXterm
         id: mobaxterm
@@ -163,13 +149,14 @@ jobs:
           7z x MobaXterm*.zip -oMobaXterm
           mv MobaXterm/MobaXterm* MobaXterm/MobaXterm.exe
           7z -mx9 a ~/tools/MobaXterm_${ver}.zip ./MobaXterm
-          echo "::set-output name=version::$ver"
+          echo "version=$ver" >> $GITHUB_OUTPUT
       -
         name: Get winscp
         id: winscp
         run: |
           ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
           mkdir -p winscp && cd $_
+          echo "version=$ver" >> $GITHUB_OUTPUT
 
           if [ "$WINSCP_VER" != "0" ]; then
               ver=$WINSCP_VER
@@ -178,9 +165,8 @@ jobs:
           wget -Owinscp.zip https://winscp.net/download/WinSCP-${ver}-Portable.zip
           unzip winscp.zip && rm winscp.zip
           7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
-          echo "::set-output name=version::$ver"
       -
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: tools
           path: ~/tools
@@ -248,7 +234,7 @@ jobs:
           chmod +x bin/clangd
 
           ver=$(./bin/clangd --version | grep -Po "\d+\.\d+\.\d+")
-          echo "::set-output name=version::$ver"
+          echo "version=$ver" >> $GITHUB_OUTPUT
 
           #mkdir clangd_$ver && mv bin lib $_
           #XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd_$ver
@@ -270,7 +256,7 @@ jobs:
           mkdir clang_format_$ver && mv bin lib $_
           XZ_OPT=-9 tar cJvf ~/tools/clang_format_linux_amd64.txz clang_format_$ver
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: tools
           path: ~/tools
@@ -313,7 +299,7 @@ jobs:
           ./ccls --version
           ldd ./ccls || true
           XZ_OPT=-9 tar cJvf ~/tools/ccls_linux_amd64.txz ccls
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: tools
           path: ~/tools
@@ -349,7 +335,7 @@ jobs:
           copy c:\Windows\System32\msvcp140.dll .\ccls\
 
           7z -mx9 a ..\ccls_windows_amd64.zip ccls
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: tools
           path: ./ccls_windows_amd64.zip
@@ -360,8 +346,8 @@ jobs:
     needs: [ubuntu, clangd, ccls, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
       - name: Download data
         run: ls -la
 
@@ -380,7 +366,6 @@ jobs:
             echo "* winscp ${{ needs.ubuntu.outputs.winscp_ver }}"
             echo "* tig ${{ needs.ubuntu.outputs.tig_ver }} static"
             echo "* ctags nightly static"
-            echo "* tap nightly"
             echo "* make 3.8.2"
           } | tee /tmp/note.md
           gh release delete tools -y || true
