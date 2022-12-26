@@ -28,13 +28,7 @@ jobs:
           sudo apt-get update
           sudo apt install -y automake
           mkdir -p ~/tools
-      -
-        name: Install xmake
-        run: |
-          ver=$(curl -sv "https://github.com/xmake-io/xmake/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
-          wget -qOxmake.deb https://github.com/xmake-io/xmake/releases/download/v$ver/xmake-v$ver.amd64.deb
-          sudo apt install -y ./xmake.deb
-          xmake --version
+          echo $PATH
       -
         name: Build make 3.82
         run: |
@@ -57,17 +51,17 @@ jobs:
           wget -qOlibxml2.tgz https://github.com/GNOME/libxml2/archive/refs/tags/v2.9.12.tar.gz
           tar xzf libxml2.tgz
           cd libxml2-*
-          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local \
+          ./autogen.sh --prefix=/usr/local \
                   --sysconfdir=/etc --localstatedir=/var --runstatedir=/run \
-                  --disable-option-checking --disable-silent-rules --disable-maintainer-mode --disable-dependency-tracking"
-          sudo xmake --root
+                  --disable-option-checking --disable-silent-rules --disable-maintainer-mode --disable-dependency-tracking
+          make -j && sudo make install
 
           echo "build ctags latest"
           git clone https://github.com/universal-ctags/ctags
           cd ctags
-          xmake f --trybuild=autoconf --tryconfigs="--enable-static" --cxflags="-s -Os"
-          xmake
-          cp build/artifacts/bin/ctags .
+          ./autogen.sh
+          ./configure --enable-static CFLAGS="-s -Os"
+          make -j
           chmod a+x ./ctags
           ./ctags --version
           ldd ./ctags || true
@@ -81,10 +75,10 @@ jobs:
           wget -qOncurses.tgz https://mirrors.aliyun.com/gnu/ncurses/ncurses-6.3.tar.gz
           tar xzf ncurses.tgz
           cd ncurses-*
-          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local \
+          ./configure --prefix=/usr/local \
                   --enable-widec --enable-pc-files --with-terminfo-dirs='/etc/terminfo:/lib/terminfo:/usr/share/terminfo' \
-                  --without-debug --without-tests"
-          sudo xmake --root
+                  --without-debug --without-tests
+          make -j && sudo make install
           cd -
 
           echo "install readline 8.1"
@@ -92,8 +86,8 @@ jobs:
           wget -qOreadline.tgz https://mirrors.aliyun.com/gnu/readline/readline-8.1.tar.gz
           tar xzf readline.tgz
           cd readline-*
-          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local"
-          sudo xmake --root
+          ./configure --prefix=/usr/local
+          make -j && sudo make install
           cd -
 
           ver=$(curl -sv "https://github.com/PCRE2Project/pcre2/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+")
@@ -101,12 +95,12 @@ jobs:
           wget -qOpcre2.tgz https://github.com/PCRE2Project/pcre2/releases/download/pcre2-$ver/pcre2-$ver.tar.gz
           tar xzf pcre2.tgz
           cd pcre2-*
-          xmake f --trybuild=autoconf --tryconfigs="--prefix=/usr/local \
+          ./configure --prefix=/usr/local \
               --build=x86_64-linux-gnu --sysconfdir=/etc --localstatedir=/var \
               --disable-option-checking --disable-silent-rules \
               --disable-maintainer-mode --disable-dependency-tracking --enable-pcre2-16 --enable-pcre2-32 \
-              --disable-pcre2grep-callout"
-          sudo xmake --root
+              --disable-pcre2grep-callout
+          make -j && sudo make install
           cd -
 
           echo "build tig latest release"
