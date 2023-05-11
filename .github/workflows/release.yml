@@ -19,6 +19,7 @@ jobs:
       putty_ver: ${{ steps.putty.outputs.version }}
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
       tig_ver: ${{ steps.tig.outputs.version }}
+      astyle_ver: ${{ steps.astyle.outputs.version }}
     env:
       WINSCP_VER: ${{ secrets.WINSCP_VER }}
     steps:
@@ -66,6 +67,29 @@ jobs:
           ./ctags --version
           ldd ./ctags || true
           XZ_OPT=-9 tar cJvf ~/tools/ctags_linux_amd64.txz ctags
+      -
+        name: Build astyle
+        id: astyle
+        run: |
+          echo "build astyle latest"
+          git clone https://gitlab.com/saalen/astyle.git
+          cd astyle
+
+          release=$(git tag | grep release)
+          ver=${release%_release}
+          git checkout $release
+
+          cd AStyle
+          mkdir out && cd $_
+          cmake ../ -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static"
+          make -j
+
+          chmod a+x ./astyle
+          ./astyle --version
+          ldd ./astyle || true
+          XZ_OPT=-9 tar cJvf ~/tools/astyle_linux_amd64.txz astyle
+
+          echo "version=$ver" >> $GITHUB_OUTPUT
       -
         name: Build tig
         id: tig
@@ -181,10 +205,11 @@ jobs:
           ninja --version
 
           sudo apt-get update
-          sudo apt-get install -y libz-dev libc-ares-dev
+          sudo apt-get install -y libz-dev libzstd-dev libc-ares-dev
           clang++ --version
+          cmake --version
 
-      - name: Build clangd with rpath
+      - name: Build clangd clang-format
         id: clangd
         run: |
           #ver=$(curl -s "https://github.com/llvm/llvm-project/releases/latest" | grep -Po "(\d+\.){2}\d+")
@@ -204,51 +229,63 @@ jobs:
                 -DLLVM_ENABLE_TERMINFO=OFF \
                 -DCLANG_PLUGIN_SUPPORT=OFF \
                 -DLLVM_ENABLE_PLUGINS=OFF \
-                -DLLVM_ENABLE_ZLIB=FORCE_ON \
                 -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
                 -DCMAKE_C_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
                 -DCMAKE_CXX_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
-                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang"
+                -DLLVM_BUILD_STATIC=ON \
+                -DLLVM_ENABLE_ZSTD=FORCE_ON \
+                -DLLVM_USE_STATIC_ZSTD=TRUE \
+                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-Wl,-s"
+
+                #-DLLVM_BUILD_STATIC=ON \
+                #-DLLVM_BUILD_STATIC=OFF \
+                #-DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang"
+
 
           ninja -C Release clangd
           ldd Release/bin/clangd && du -b $_ && chmod +x $_
-          mkdir bin lib
-          cp Release/bin/clangd bin/clangd_origin
+          rm -rf ./bin ./lib
+          mkdir -p bin lib/clang
+
           cp -r Release/lib/clang lib/
-          ldd bin/clangd_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} bin/ld.so
-          ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
-          {
-            echo "#!/usr/bin/env bash"
-            echo 'cd "$(dirname $(readlink -f $0))"'
-            echo 'exec ./ld.so ./clangd_origin $@'
-          } > bin/clangd
-          chmod +x bin/clangd
+          mv Release/bin/clangd bin/
+          #mv Release/bin/clangd bin/clangd_origin
+          #ldd bin/clangd_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
+          #ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
+          #{
+            #echo "#!/usr/bin/env bash"
+            #echo 'cd "$(dirname $(readlink -f $0))"'
+            #echo 'exec ../lib/clang/ld.so ./clangd_origin $@'
+          #} > bin/clangd
+          #chmod +x bin/clangd
 
           ver=$(./bin/clangd --version | grep -Po "\d+\.\d+\.\d+")
           echo "version=$ver" >> $GITHUB_OUTPUT
 
-          #mkdir clangd_$ver && mv bin lib $_
-          #XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd_$ver
           mkdir clangd && mv bin lib $_
           XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd
 
           ninja -C Release clang-format
           ldd Release/bin/clang-format && du -b $_ && chmod +x $_
+          rm -rf ./bin ./lib
           mkdir -p bin lib/clang
-          mv Release/bin/clang-format lib/clang/
-          ldd lib/clang/clang-format | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
-          ldd lib/clang/clang-format | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
-          {
-            echo "#!/usr/bin/env bash"
-            echo 'cd "$(dirname $(readlink -f $0))/../lib/clang"'
-            echo 'exec ./ld.so ./clang-format $@'
-          } > bin/clang-format
-          chmod +x bin/clang-format
-          mkdir clang_format_$ver && mv bin lib $_
-          XZ_OPT=-9 tar cJvf ~/tools/clang_format_linux_amd64.txz clang_format_$ver
+
+          mv Release/bin/clang-format bin/
+          #mv Release/bin/clang-format bin/clang-format_origin
+          #ldd bin/clang-format_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
+          #ldd bin/clang-format_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
+          #{
+            #echo "#!/usr/bin/env bash"
+            #echo 'cd "$(dirname $(readlink -f $0))"'
+            #echo 'exec ../lib/clang/ld.so ./clang-format_origin $@'
+          #} > bin/clang-format
+          #chmod +x bin/clang-format
+
+          mkdir clang_format && mv bin lib $_
+          XZ_OPT=-9 tar cJvf ~/tools/clang_format_linux_amd64.txz clang_format
 
       - uses: actions/upload-artifact@v3
         with:
@@ -351,16 +388,17 @@ jobs:
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
-            echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} nightly with rpath lib"
-            echo "* clang-format ${{ needs.clangd.outputs.clangd_ver }} nightly with rpath lib"
+            echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} nightly static"
+            echo "* clang-format ${{ needs.clangd.outputs.clangd_ver }} nightly static"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
+            echo "* ctags nightly static"
+            echo "* tig ${{ needs.ubuntu.outputs.tig_ver }} static"
+            echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
+            echo "* make 3.8.2"
             echo "* putty ${{ needs.ubuntu.outputs.putty_ver }}"
             echo "* MobaXterm ${{ needs.ubuntu.outputs.mobaxterm_ver }}"
             echo "* winscp ${{ needs.ubuntu.outputs.winscp_ver }}"
-            echo "* tig ${{ needs.ubuntu.outputs.tig_ver }} static"
-            echo "* ctags nightly static"
-            echo "* make 3.8.2"
           } | tee /tmp/note.md
           gh release delete tools -y || true
           git push origin :tools || true

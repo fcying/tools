@@ -1,16 +1,17 @@
 #### My Favorite Tools
 
-#### binary (download from releases)
-* [tig](https://github.com/jonas/tig)
-* [universal-ctags](https://github.com/universal-ctags/ctags)
+#### binary (download from [Releases](https://github.com/fcying/tools/releases))
+* [tig static](https://github.com/jonas/tig)
+* [universal-ctags static](https://github.com/universal-ctags/ctags)
+* [astyle static](https://astyle.sourceforge.net/)
+* [ccls static](https://github.com/MaskRay/ccls)
+* [clangd static](https://github.com/clangd/clangd)
+* [clang-format static](https://github.com/llvm/llvm-project)
 * [winscp](https://winscp.net)
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)
 * [MobaXterm](https://mobaxterm.mobatek.net/)
-* [ccls](https://github.com/MaskRay/ccls)
 * [make 3.8.2](https://ftp.gnu.org/gnu/make)
 * [openjdk](https://openjdk.java.net)
-* [clangd](https://github.com/clangd/clangd)
-* [clang-format](https://github.com/llvm/llvm-project)
 * [llvm](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option
     ```
