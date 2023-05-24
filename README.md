@@ -5,7 +5,7 @@
 * [universal-ctags static](https://github.com/universal-ctags/ctags)
 * [astyle static](https://astyle.sourceforge.net/)
 * [ccls static](https://github.com/MaskRay/ccls)
-* [clangd static](https://github.com/clangd/clangd)
+* [clangd with rpath lib](https://github.com/clangd/clangd)
 * [clang-format static](https://github.com/llvm/llvm-project)
 * [winscp](https://winscp.net)
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)

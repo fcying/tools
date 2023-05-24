@@ -221,6 +221,7 @@ jobs:
           git clone https://github.com/llvm/llvm-project --depth 1
           cd llvm-project
 
+          # build clangd
           cmake -S llvm -B Release -G Ninja \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DLLVM_TARGETS_TO_BUILD="X86" \
@@ -235,12 +236,14 @@ jobs:
                 -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
                 -DCMAKE_C_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
                 -DCMAKE_CXX_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
-                -DLLVM_BUILD_STATIC=ON \
+                -DLLVM_ENABLE_ZLIB=OFF \
                 -DLLVM_ENABLE_ZSTD=FORCE_ON \
                 -DLLVM_USE_STATIC_ZSTD=TRUE \
-                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-Wl,-s"
+                -DLLVM_BUILD_STATIC=OFF \
+                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang"
 
                 #-DLLVM_BUILD_STATIC=ON \
+                #-DCMAKE_EXE_LINKER_FLAGS_RELEASE="-Wl,-s"
                 #-DLLVM_BUILD_STATIC=OFF \
                 #-DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang"
 
@@ -251,22 +254,44 @@ jobs:
           mkdir -p bin lib/clang
 
           cp -r Release/lib/clang lib/
-          mv Release/bin/clangd bin/
-          #mv Release/bin/clangd bin/clangd_origin
-          #ldd bin/clangd_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
-          #ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
-          #{
-            #echo "#!/usr/bin/env bash"
-            #echo 'cd "$(dirname $(readlink -f $0))"'
-            #echo 'exec ../lib/clang/ld.so ./clangd_origin $@'
-          #} > bin/clangd
-          #chmod +x bin/clangd
+
+          #mv Release/bin/clangd bin/
+          mv Release/bin/clangd bin/clangd_origin
+          ldd bin/clangd_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
+          ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
+          {
+            echo "#!/usr/bin/env bash"
+            echo 'cd "$(dirname $(readlink -f $0))"'
+            echo 'exec ../lib/clang/ld.so ./clangd_origin $@'
+          } > bin/clangd
+          chmod +x bin/clangd
 
           ver=$(./bin/clangd --version | grep -Po "\d+\.\d+\.\d+")
           echo "version=$ver" >> $GITHUB_OUTPUT
 
           mkdir clangd && mv bin lib $_
           XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd
+
+          # build clang-format
+          cmake -S llvm -B Release -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DLLVM_TARGETS_TO_BUILD="X86" \
+                -DLLVM_ENABLE_ASSERTIONS=OFF \
+                -DLLVM_ENABLE_BACKTRACES=ON \
+                -DLLVM_ENABLE_TERMINFO=OFF \
+                -DCLANG_PLUGIN_SUPPORT=OFF \
+                -DLLVM_ENABLE_PLUGINS=OFF \
+                -DLLVM_STATIC_LINK_CXX_STDLIB=ON \
+                -DCMAKE_C_COMPILER=clang \
+                -DCMAKE_CXX_COMPILER=clang++ \
+                -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" \
+                -DCMAKE_C_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
+                -DCMAKE_CXX_FLAGS_RELEASE="-gline-tables-only -DNDEBUG -Os" \
+                -DLLVM_ENABLE_ZLIB=OFF \
+                -DLLVM_ENABLE_ZSTD=FORCE_ON \
+                -DLLVM_USE_STATIC_ZSTD=TRUE \
+                -DLLVM_BUILD_STATIC=ON \
+                -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-Wl,-s"
 
           ninja -C Release clang-format
           ldd Release/bin/clang-format && du -b $_ && chmod +x $_
@@ -388,7 +413,7 @@ jobs:
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
-            echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} nightly static"
+            echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} nightly with rpath lib"
             echo "* clang-format ${{ needs.clangd.outputs.clangd_ver }} nightly static"
             echo "* ccls nightly static"
             echo "build with llvm ${{ env.llvm_ver }}"
