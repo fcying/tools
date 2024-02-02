@@ -1,12 +1,13 @@
 #### My Favorite Tools
 
-#### binary (download from [Releases](https://github.com/fcying/tools/releases))
+#### binary ([download](https://github.com/fcying/tools/releases))
 * [tig static](https://github.com/jonas/tig)
 * [universal-ctags static](https://github.com/universal-ctags/ctags)
 * [astyle static](https://astyle.sourceforge.net/)
 * [ccls static](https://github.com/MaskRay/ccls)
 * [clangd with rpath lib](https://github.com/clangd/clangd)
 * [clang-format static](https://github.com/llvm/llvm-project)
+* [luals nightly](https://github.com/LuaLS/lua-language-server)
 * [winscp](https://winscp.net)
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)
 * [MobaXterm](https://mobaxterm.mobatek.net/)
@@ -21,11 +22,6 @@
     cmake -Hllvm -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_PROJECTS=clang
     ninja -C Release clangFormat clangFrontendTool clangIndex clangTooling clang
     ```
-
-
-#### mirror
-* [ghproxy](https://ghproxy.com)
-
 
 #### link
 * [ripgrep](https://github.com/BurntSushi/ripgrep)

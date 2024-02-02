@@ -19,6 +19,7 @@ jobs:
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
       tig_ver: ${{ steps.tig.outputs.version }}
       astyle_ver: ${{ steps.astyle.outputs.version }}
+      luals_ver: ${{ steps.luals.outputs.version }}
     env:
       WINSCP_VER: ${{ secrets.WINSCP_VER }}
     steps:
@@ -26,7 +27,7 @@ jobs:
         name: Init Env
         run: |
           sudo apt-get update
-          sudo apt install -y automake
+          sudo apt install -y automake ninja-build
           mkdir -p ~/tools
           echo $PATH
       -
@@ -41,6 +42,25 @@ jobs:
           cd /opt/make_3.8.2/bin
           ./make --version
           XZ_OPT=-9 tar cJvf ~/tools/make_3.8.2_linux_amd64.txz /opt/make_3.8.2
+      -
+        name: Build luals
+        id: luals
+        run: |
+          git clone https://github.com/LuaLS/lua-language-server --recurse-submodules
+          cd lua-language-server/3rd/EmmyLuaCodeStyle
+          git checkout master
+          cd ../../
+          git add .
+          ./make.sh
+
+          chmod +x ./bin/*
+          ver=$(./bin/lua-language-server --version)
+          ver="${ver}-$(git rev-parse --short HEAD)"
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+          mkdir lua-language-server
+          cp -r main.lua debugger.lua LICENSE changelog.md locale meta script bin ./lua-language-server/
+          XZ_OPT=-9 tar cJf ~/tools/lua-language-server.txz ./lua-language-server
       -
         name: Build ctags
         id: ctags
@@ -182,8 +202,8 @@ jobs:
           wget -Owinscp.zip https://winscp.net/download/WinSCP-${ver}-Portable.zip
           unzip winscp.zip && rm winscp.zip
           7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
-      -
-        uses: actions/upload-artifact@v3
+
+      - uses: actions/upload-artifact@v3
         with:
           name: tools
           path: ~/tools
@@ -234,7 +254,7 @@ jobs:
           cmake --version
 
       - name: Clone scripts
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download llvm
         run: |
@@ -402,7 +422,7 @@ jobs:
     needs: [ubuntu, clangd, ccls, windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v3
       - name: Download data
         run: ls -la
@@ -415,8 +435,8 @@ jobs:
           {
             echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} last release with rpath lib"
             echo "* clang-format ${{ needs.clangd.outputs.clangd_ver }} last release static"
-            echo "* ccls nightly static"
-            echo "build with llvm ${{ env.llvm_ver }}"
+            echo "* ccls nightly static(build with llvm ${{ env.llvm_ver }})"
+            echo "* luals ${{ needs.ubuntu.outputs.luals_ver }}"
             echo "* ctags nightly static"
             echo "* tig ${{ needs.ubuntu.outputs.tig_ver }} static"
             echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
