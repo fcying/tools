@@ -8,6 +8,7 @@
 * [clangd with rpath lib](https://github.com/clangd/clangd)
 * [clang-format static](https://github.com/llvm/llvm-project)
 * [luals nightly](https://github.com/LuaLS/lua-language-server)
+* [autohotkey2-lsp](https://github.com/thqby/vscode-autohotkey2-lsp)
 * [winscp](https://winscp.net)
 * [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)
 * [MobaXterm](https://mobaxterm.mobatek.net/)

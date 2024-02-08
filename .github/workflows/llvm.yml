@@ -64,7 +64,7 @@ jobs:
         run: |
           7z a llvm_msvc.7z -mx9 llvm
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: llvm
           path: c:\llvm_msvc.7z
@@ -74,8 +74,8 @@ jobs:
     needs: [windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
       - name: Download data
         run: ls -la
       - name: Publish
@@ -86,12 +86,9 @@ jobs:
             echo "llvm version: ${{ needs.windows.outputs.version }}"
             echo "VC++ compiler toolset version: 14.29"
           } | tee /tmp/note.md
-          tag_name=llvm-${{ needs.windows.outputs.version }}
-          if [ "${{ needs.windows.outputs.version }}" == "latest" ]; then
-            prerelease="-p"
-          else
-            prerelease=""
-          fi
+          tag_name=llvm_temp
           gh release delete $tag_name -y || true
           git push origin :$tag_name || true
-          gh release create $tag_name $prerelease -t "$tag_name" -F "/tmp/note.md" --target $GITHUB_SHA ./llvm/*
+          gh release create $tag_name -F "/tmp/note.md" -d --target $GITHUB_SHA
+          gh release upload $tag_name --clobber ./llvm/*
+          gh release edit $tag_name --tag llvm-${{ needs.windows.outputs.version }} --draft=false
