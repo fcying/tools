@@ -1,8 +1,8 @@
 name: workflow run pruner
 
 on:
-  schedule:
-  - cron: '15 19 * * *'
+  #schedule:
+  #- cron: '15 19 * * *'
   #push:
   #  branches: [ master ]
   workflow_dispatch:
@@ -56,6 +56,8 @@ jobs:
 
           const workflows = [
             'release.yml',
+            'clangd.yml',
+            'ccls.yml',
             'llvm.yml',
             'workflow_run_pruner.yml'
           ]

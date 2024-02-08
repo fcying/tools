@@ -1,5 +1,8 @@
 name: release
 
+permissions:
+  contents: write
+
 on:
   schedule:
   - cron: '0 18 * * *'
@@ -8,18 +11,18 @@ on:
   workflow_dispatch:
 
 env:
-  llvm_ver: 12.0.1
+  llvm_ver: 17.0.6
 
 jobs:
-  ubuntu:
+  ubuntu: #{{{
     runs-on: ubuntu-20.04
     outputs:
       winscp_ver: ${{ steps.winscp.outputs.version }}
       putty_ver: ${{ steps.putty.outputs.version }}
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
-      tig_ver: ${{ steps.tig.outputs.version }}
       astyle_ver: ${{ steps.astyle.outputs.version }}
-      luals_ver: ${{ steps.luals.outputs.version }}
+      ahk_ver: ${{ steps.ahk.outputs.version }}
+      uctags_ver: ${{ steps.uctags.outputs.version }}
     env:
       WINSCP_VER: ${{ secrets.WINSCP_VER }}
     steps:
@@ -27,7 +30,6 @@ jobs:
         name: Init Env
         run: |
           sudo apt-get update
-          sudo apt install -y automake ninja-build
           mkdir -p ~/tools
           echo $PATH
       -
@@ -43,51 +45,7 @@ jobs:
           ./make --version
           XZ_OPT=-9 tar cJvf ~/tools/make_3.8.2_linux_amd64.txz /opt/make_3.8.2
       -
-        name: Build luals
-        id: luals
-        run: |
-          git clone https://github.com/LuaLS/lua-language-server --recurse-submodules
-          cd lua-language-server/3rd/EmmyLuaCodeStyle
-          git checkout master
-          cd ../../
-          git add .
-          ./make.sh
-
-          chmod +x ./bin/*
-          ver=$(./bin/lua-language-server --version)
-          ver="${ver}-$(git rev-parse --short HEAD)"
-          echo "version=$ver" >> $GITHUB_OUTPUT
-
-          mkdir lua-language-server
-          cp -r main.lua debugger.lua LICENSE changelog.md locale meta script bin ./lua-language-server/
-          XZ_OPT=-9 tar cJf ~/tools/lua-language-server.txz ./lua-language-server
-      -
-        name: Build ctags
-        id: ctags
-        run: |
-          sudo apt-get install -y locales-all
-
-          echo "install libxml2 2.9.12"
-          wget -qOlibxml2.tgz https://github.com/GNOME/libxml2/archive/refs/tags/v2.9.12.tar.gz
-          tar xzf libxml2.tgz
-          cd libxml2-*
-          ./autogen.sh --prefix=/usr/local \
-                  --sysconfdir=/etc --localstatedir=/var --runstatedir=/run \
-                  --disable-option-checking --disable-silent-rules --disable-maintainer-mode --disable-dependency-tracking
-          make -j && sudo make install
-
-          echo "build ctags latest"
-          git clone https://github.com/universal-ctags/ctags
-          cd ctags
-          ./autogen.sh
-          ./configure --enable-static CFLAGS="-s -Os"
-          make -j
-          chmod a+x ./ctags
-          ./ctags --version
-          ldd ./ctags || true
-          XZ_OPT=-9 tar cJvf ~/tools/ctags_linux_amd64.txz ctags
-      -
-        name: Build astyle
+        name: Build astyle #{{{
         id: astyle
         run: |
           echo "build astyle latest"
@@ -110,9 +68,154 @@ jobs:
 
           echo "version=$ver" >> $GITHUB_OUTPUT
       -
-        name: Build tig
-        id: tig
+        name: Get uctags #{{{
+        id: uctags
         run: |
+          ver=$(curl -sv "https://github.com/universal-ctags/ctags-nightly-build/releases/latest" 2>&1 | grep -Po "(?<=releases/tag/).*?\+\w+")
+          date=$(echo $ver | grep -Po "^.*?(?=\+)")
+          wget -qOuctags.txz https://github.com/universal-ctags/ctags-nightly-build/releases/download/$ver/uctags-$date-linux-x86_64.tar.xz
+          tar xJf uctags.txz
+          cd uctags-*/bin
+          ver=$(./ctags --version | grep -Po "(?<=Universal Ctags )\d+\.\d+\.\d+\(\w+\)")
+          echo "version=$ver" >> $GITHUB_OUTPUT
+          XZ_OPT=-9 tar cJvf ~/tools/ctags_linux_amd64.txz ctags
+      -
+        name: Get autohotkey2 lsp #{{{
+        id: ahk
+        run: |
+          #git clone https://github.com/thqby/vscode-autohotkey2-lsp
+          #cd vscode-autohotkey2-lsp/tools
+
+          mkdir autohotkey2-lsp && cd $_
+          curl -L -o install.js https://raw.githubusercontent.com/thqby/vscode-autohotkey2-lsp/main/tools/install.js
+          node install.js
+
+          ver=$(cat CHANGELOG.md | head -1 | grep -Po "(\d+\.){2}\d+")
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+          cd ../
+          7z -mx9 a ~/tools/autohotkey2-lsp.zip ./autohotkey2-lsp
+      -
+        name: Get putty #{{{
+        id: putty
+        run: |
+          ver=$(curl -s "https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html" | grep -Po "(?<=latest release \()\d\.\d+" | head -1)
+          mkdir -p putty && cd $_
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/putty.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pscp.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/psftp.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttytel.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pageant.exe
+          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttygen.exe
+          7z -mx9 a ~/tools/putty_${ver}.zip ../putty
+          echo "version=$ver" >> $GITHUB_OUTPUT
+      -
+        name: Get MobaXterm
+        id: mobaxterm
+        run: |
+          moba_link=$(curl -s https://mobaxterm.mobatek.net/download-home-edition.html | grep -Po "https:.*?Portable.*?\.zip" | head -1)
+          ver=$(echo $moba_link | grep -Po "\d+\.\d+")
+          wget -q $moba_link
+          7z x MobaXterm*.zip -oMobaXterm
+          mv MobaXterm/MobaXterm* MobaXterm/MobaXterm.exe
+          7z -mx9 a ~/tools/MobaXterm_${ver}.zip ./MobaXterm
+          echo "version=$ver" >> $GITHUB_OUTPUT
+      -
+        name: Get winscp
+        id: winscp
+        run: |
+          ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
+          mkdir -p winscp && cd $_
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+          if [ "$WINSCP_VER" != "0" ]; then
+              ver=$WINSCP_VER
+          fi
+
+          wget -Owinscp.zip https://winscp.net/download/WinSCP-${ver}-Portable.zip
+          unzip winscp.zip && rm winscp.zip
+          7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: tools
+          path: ~/tools
+          retention-days: 1
+
+  clangd: #{{{
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - name: Check version
+        id: build
+        run: |
+          ver=$(curl -sv "https://github.com/llvm/llvm-project/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+  ccls: #{{{
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - name: Check version
+        id: build
+        run: |
+          #ver=$(curl -s https://github.com/MaskRay/ccls/tags | grep -Po "(?<=/refs/tags/).*?(?=.zip)" | head -1)
+          git clone --depth=1 https://github.com/MaskRay/ccls
+          cd ccls
+          ver="master-$(git rev-parse --short HEAD)"
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+  luals: #{{{
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - name: Build
+        id: build
+        run: |
+          mkdir -p ~/tools
+
+          ver=$(curl -sv "https://github.com/ninja-build/ninja/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
+          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ver}/ninja-linux.zip
+          7z x ninja.zip
+          sudo mv ninja /usr/local/bin
+          ninja --version
+
+          git clone https://github.com/LuaLS/lua-language-server --recurse-submodules
+          cd lua-language-server/3rd/EmmyLuaCodeStyle
+          git checkout master
+          cd ../../
+          git add .
+          ./make.sh
+
+          chmod +x ./bin/*
+          ver=$(./bin/lua-language-server --version)
+          ver="${ver}-$(git rev-parse --short HEAD)"
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+          mkdir lua-language-server
+          cp -r main.lua debugger.lua LICENSE changelog.md locale meta script bin ./lua-language-server/
+          XZ_OPT=-9 tar cJf ~/tools/lua-language-server-linux-x64.txz ./lua-language-server
+      - uses: actions/upload-artifact@v3
+        with:
+          name: tools
+          path: ~/tools
+          retention-days: 1
+
+  tig: #{{{
+    runs-on: ubuntu-20.04
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+    steps:
+      - name: Build
+        id: build
+        run: |
+          sudo apt-get update
+          sudo apt install -y automake
+          mkdir -p ~/tools
           echo "install ncursesw 6.3"
           # https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.3.tar.gz
           wget -qOncurses.tgz https://mirrors.aliyun.com/gnu/ncurses/ncurses-6.3.tar.gz
@@ -161,271 +264,20 @@ jobs:
           ldd ./tig || true
           XZ_OPT=-9 tar cJvf ~/tools/tig_linux_amd64.txz tig
           echo "version=$ver" >> $GITHUB_OUTPUT
-      -
-        name: Get putty
-        id: putty
-        run: |
-          ver=$(curl -s "https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html" | grep -Po "(?<=latest release \()\d\.\d+" | head -1)
-          mkdir -p putty && cd $_
-          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/putty.exe
-          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pscp.exe
-          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/psftp.exe
-          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttytel.exe
-          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe
-          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/pageant.exe
-          wget -q https://the.earth.li/~sgtatham/putty/latest/w64/puttygen.exe
-          7z -mx9 a ~/tools/putty_${ver}.zip ../putty
-          echo "version=$ver" >> $GITHUB_OUTPUT
-      -
-        name: Get MobaXterm
-        id: mobaxterm
-        run: |
-          moba_link=$(curl -s https://mobaxterm.mobatek.net/download-home-edition.html | grep -Po "https:.*?Portable.*?\.zip" | head -1)
-          ver=$(echo $moba_link | grep -Po "\d+\.\d+")
-          wget -q $moba_link
-          7z x MobaXterm*.zip -oMobaXterm
-          mv MobaXterm/MobaXterm* MobaXterm/MobaXterm.exe
-          7z -mx9 a ~/tools/MobaXterm_${ver}.zip ./MobaXterm
-          echo "version=$ver" >> $GITHUB_OUTPUT
-      -
-        name: Get winscp
-        id: winscp
-        run: |
-          ver=$(curl -s "https://github.com/winscp/winscp/tags" | grep -Po "(?<=tags/)(\d+\.){2}\d+(?=\.zip)" | head -1)
-          mkdir -p winscp && cd $_
-          echo "version=$ver" >> $GITHUB_OUTPUT
-
-          if [ "$WINSCP_VER" != "0" ]; then
-              ver=$WINSCP_VER
-          fi
-
-          wget -Owinscp.zip https://winscp.net/download/WinSCP-${ver}-Portable.zip
-          unzip winscp.zip && rm winscp.zip
-          7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
-
       - uses: actions/upload-artifact@v3
         with:
           name: tools
           path: ~/tools
           retention-days: 1
 
-  clangd:
-    runs-on: ubuntu-20.04
-    env:
-        cmake_rpath: >-
-          "-DCMAKE_EXE_LINKER_FLAGS=-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang -Wl,--compress-debug-sections=zlib"
-        cmake_static: >-
-          "-DLLVM_BUILD_STATIC=ON"
-          "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-s -Wl,--compress-debug-sections=zlib"
-        cmake: >-
-          "-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra;openmp"
-          "-DLLVM_ENABLE_ASSERTIONS=OFF"
-          "-DLLVM_ENABLE_BACKTRACES=ON"
-          "-DLLVM_ENABLE_TERMINFO=OFF"
-          "-DCMAKE_BUILD_TYPE=Release"
-          "-DCLANG_PLUGIN_SUPPORT=OFF"
-          "-DLLVM_ENABLE_PLUGINS=OFF"
-          "-DCMAKE_C_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG -include $GITHUB_WORKSPACE/.github/workflows/lib_compat.h"
-          "-DCMAKE_CXX_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG -include $GITHUB_WORKSPACE/.github/workflows/lib_compat.h"
-          "-DCLANGD_ENABLE_REMOTE=OFF"
-          "-DLLVM_ENABLE_ZSTD=OFF"
-          "-DCMAKE_C_COMPILER=clang"
-          "-DCMAKE_CXX_COMPILER=clang++"
-          "-DLLVM_STATIC_LINK_CXX_STDLIB=ON"
-          "-DLLVM_ENABLE_ZLIB=FORCE_ON"
-          "-DCMAKE_PROJECT_INCLUDE=$GITHUB_WORKSPACE/.github/workflows/linux-static-deps.cmake"
-
-    outputs:
-      clangd_ver: ${{ steps.clangd.outputs.version }}
-    steps:
-      - name: Init env
-        run: |
-          mkdir -p ~/tools
-
-          ver=$(curl -sv "https://github.com/ninja-build/ninja/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
-          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ver}/ninja-linux.zip
-          7z x ninja.zip
-          sudo mv ninja /usr/local/bin
-          ninja --version
-
-          sudo apt-get update
-          sudo apt-get install -y libz-dev libzstd-dev libc-ares-dev
-          clang++ --version
-          cmake --version
-
-      - name: Clone scripts
-        uses: actions/checkout@v4
-
-      - name: Download llvm
-        run: |
-          ver=$(curl -sv "https://github.com/llvm/llvm-project/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
-          src_link="https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/llvm-project-$ver.src.tar.xz"
-          wget -qOllvm.txz $src_link
-          tar xJf llvm.txz
-          mv llvm-project-* llvm-project
-          ls
-
-          #git clone https://github.com/llvm/llvm-project --depth 1
-          #cd llvm-project
-
-      - name: Build clangd
-        id: clangd
-        run: |
-          cd llvm-project
-
-          cmake -S llvm -B Release -G Ninja ${{ env.cmake }} ${{ env.cmake_rpath }}
-          ninja -C Release clangd
-
-          ldd Release/bin/clangd && du -b $_ && chmod +x $_
-          rm -rf ./bin ./lib
-          mkdir -p bin lib/clang
-
-          cp -r Release/lib/clang lib/
-
-          #mv Release/bin/clangd bin/
-          mv Release/bin/clangd bin/clangd_origin
-          # ld.so need in the save folder with clangd: get Qt error "No matching member function for call to 'connect'" with custom QObject
-          ldd bin/clangd_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} bin/ld.so
-          ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
-          {
-            echo "#!/usr/bin/env bash"
-            echo 'cd "$(dirname $(readlink -f $0))"'
-            echo 'exec ./ld.so ./clangd_origin $@'
-          } > bin/clangd
-          chmod +x bin/clangd
-
-          ver=$(./bin/clangd --version | grep -Po "\d+\.\d+\.\d+")
-          echo "version=$ver" >> $GITHUB_OUTPUT
-
-          mkdir clangd && mv bin lib $_
-          XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd
-
-      - name: Build clang-format
-        run: >
-          cd llvm-project
-
-          cmake -S llvm -B Release -G Ninja
-          ${{ env.cmake }}
-          ${{ env.cmake_static }}
-
-          ninja -C Release clang-format
-      - name: Pack clang_format
-        id: clang_format
-        run: |
-          cd llvm-project
-          ldd Release/bin/clang-format && du -b $_ && chmod +x $_
-          rm -rf ./bin ./lib
-          mkdir -p bin lib/clang
-
-          mv Release/bin/clang-format bin/
-          #mv Release/bin/clang-format bin/clang-format_origin
-          #ldd bin/clang-format_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
-          #ldd bin/clang-format_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
-          #{
-            #echo "#!/usr/bin/env bash"
-            #echo 'cd "$(dirname $(readlink -f $0))"'
-            #echo 'exec ../lib/clang/ld.so ./clang-format_origin $@'
-          #} > bin/clang-format
-          #chmod +x bin/clang-format
-
-          mkdir clang_format && mv bin lib $_
-          XZ_OPT=-9 tar cJvf ~/tools/clang_format_linux_amd64.txz clang_format
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tools
-          path: ~/tools
-          retention-days: 1
-
-  ccls:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Download llvm
-        run: |
-          mkdir -p ~/tools
-          wget -qOllvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_ver}/clang+llvm-${llvm_ver}-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
-          tar xJf llvm.tar.xz
-          pwd && ls
-          mv clang* llvm
-      - name: Download ccls
-        run: |
-          ver=$(curl -sv "https://github.com/ninja-build/ninja/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
-          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ver}/ninja-linux.zip
-          7z x ninja.zip
-          sudo mv ninja /usr/local/bin
-          ninja --version
-
-          cat /proc/cpuinfo | grep processor
-          cmake --version
-          g++ --version
-          git clone --recursive https://github.com/MaskRay/ccls
-      - name: Build ccls
-        run: |
-          cd ccls
-
-          # /usr/bin/ld: cannot find -lgcc_s
-          sed 's/project(ccls LANGUAGES CXX C)/project(ccls LANGUAGES CXX)/' -i CMakeLists.txt
-
-          #cmake -S. -BRelease -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static-libgcc -static-libstdc++"
-          cmake -S. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -Os -s -flto"
-          ninja -C Release
-
-          mv Release/ccls .
-          chmod a+x ./ccls
-          ./ccls --version
-          ldd ./ccls || true
-          XZ_OPT=-9 tar cJvf ~/tools/ccls_linux_amd64.txz ccls
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tools
-          path: ~/tools
-          retention-days: 1
-
-  windows:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: cmd
-    steps:
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64
-      - name: Download llvm
-        run: |
-          cd /d c:\
-          curl -L -ollvm.7z https://github.com/fcying/tools/releases/download/llvm-v${{ env.llvm_ver }}/llvm_msvc.7z
-          7z x llvm.7z
-          dir
-      - name: Build ccls
-        run: |
-          git clone --depth=1 --recursive https://github.com/MaskRay/ccls
-          cd ccls
-          cmake -H. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH="c:/llvm/Release"
-          ninja -C Release
-
-          .\Release\ccls.exe --version
-          mkdir ccls
-          copy Release\ccls.exe .\ccls\
-          copy c:\Windows\System32\vcruntime140_1.dll .\ccls\
-          copy c:\Windows\System32\vcruntime140.dll .\ccls\
-          copy c:\Windows\System32\msvcp140.dll .\ccls\
-
-          7z -mx9 a ..\ccls_windows_amd64.zip ccls
-      - uses: actions/upload-artifact@v3
-        with:
-          name: tools
-          path: ./ccls_windows_amd64.zip
-          retention-days: 1
-
-  publish:
-    #needs: [ubuntu]
-    needs: [ubuntu, clangd, ccls, windows]
+  publish: #{{{
+    needs: [ubuntu, clangd, ccls, luals, tig]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v3
       - name: Download data
-        run: ls -la
+        run: ls -la tools
 
       - name: Publish
         env:
@@ -433,18 +285,25 @@ jobs:
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
-            echo "* clangd ${{ needs.clangd.outputs.clangd_ver }} last release with rpath lib"
-            echo "* clang-format ${{ needs.clangd.outputs.clangd_ver }} last release static"
-            echo "* ccls nightly static(build with llvm ${{ env.llvm_ver }})"
-            echo "* luals ${{ needs.ubuntu.outputs.luals_ver }}"
-            echo "* ctags nightly static"
-            echo "* tig ${{ needs.ubuntu.outputs.tig_ver }} static"
+            echo "* clangd ${{ needs.clangd.outputs.version }} last release with rpath lib"
+            echo "* clang-format ${{ needs.clangd.outputs.version }} last release static"
+            echo "* ccls ${{ needs.ccls.outputs.version }} linux (build with llvm ${{ env.llvm_ver }})"
+            echo "* ccls ${{ needs.ccls.outputs.version }} windows(build with llvm ${{ env.llvm_ver }})"
+            echo "* uctags ${{ needs.ubuntu.outputs.uctags_ver }} static"
+            echo "* luals ${{ needs.luals.outputs.version }}"
+            echo "* autohotkey2-lsp ${{ needs.ubuntu.outputs.ahk_ver }}"
+            echo "* tig ${{ needs.tig.outputs.version }} static"
             echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
             echo "* make 3.8.2"
             echo "* putty ${{ needs.ubuntu.outputs.putty_ver }}"
             echo "* MobaXterm ${{ needs.ubuntu.outputs.mobaxterm_ver }}"
             echo "* winscp ${{ needs.ubuntu.outputs.winscp_ver }}"
           } | tee /tmp/note.md
-          gh release delete tools -y || true
-          git push origin :tools || true
-          gh release create tools -t "tools" -F "/tmp/note.md" --target $GITHUB_SHA ./tools/*
+          #upload to draft, publish after clangd build end
+          tag_name=release_temp
+          if [ $(gh release list | grep $tag_name -c) -eq 0 ]; then
+            gh release create $tag_name -t "tools" -F "/tmp/note.md" -d --target $GITHUB_SHA
+          else
+            gh release edit $tag_name -F "/tmp/note.md" --target $GITHUB_SHA
+          fi
+          gh release upload $tag_name --clobber ./tools/*
