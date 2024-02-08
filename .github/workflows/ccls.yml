@@ -1,0 +1,159 @@
+name: ccls
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+  - cron: '0 18 * * *'
+  push:
+    branches: [ master, test ]
+  workflow_dispatch:
+
+env:
+  llvm_ver: 17.0.6
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,   target: linux, platform: linux-x64, container: 'ubuntu:22.04' }
+          - { os: windows-latest, target: windows, platform: win32-x64 }
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - name: Prepare container
+        if: ${{ matrix.target == 'linux' }}
+        run: |
+          mkdir /tmp/tools
+          apt-get update
+          apt-get install -y build-essential git ninja-build wget curl
+          apt-get install -y zlib1g-dev libncurses-dev libzstd-dev libxml2-dev
+
+          wget -qOcmake.tgz https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.tar.gz
+          tar xzf cmake.tgz
+          cp -rf cmake-*/* /usr/local/ || true
+          cmake --version
+          ninja --version
+
+      - name: Prepare linux code
+        if: ${{ matrix.target == 'linux' }}
+        run: |
+          #wget -qOllvm.txz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_ver}/clang+llvm-${llvm_ver}-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
+          wget -qOllvm.txz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${llvm_ver}/clang+llvm-${llvm_ver}-x86_64-linux-gnu-ubuntu-22.04.tar.xz"
+          tar xJf llvm.txz
+          pwd && ls -la
+          mv clang* llvm
+          git clone --recursive https://github.com/MaskRay/ccls
+
+      - name: Build linux
+        if: ${{ matrix.target == 'linux' }}
+        id: build
+        run: |
+          cd ccls
+          # static build with llvm 12.0.1
+          # /usr/bin/ld: cannot find -lgcc_s
+          #sed 's/project(ccls LANGUAGES CXX C)/project(ccls LANGUAGES CXX)/' -i CMakeLists.txt
+          #cmake -S. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-static -pthread -lrt -ldl -Wl,--whole-archive -lpthread -Wl,--no-whole-archive -Os -s -flto"
+
+          # build with llvm
+          cmake -S. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=../llvm -DCMAKE_CXX_FLAGS="-Os -s -flto"
+          ninja -C Release
+
+          mv Release/ccls .
+          chmod a+x ./ccls
+          ./ccls --version
+          ver=$(./ccls --version | grep -Po "(?<=ccls version ).*")
+          ldd ./ccls || true
+          XZ_OPT=-9 tar cJvf /tmp/tools/ccls_linux_amd64.txz ccls
+          echo "version=$ver" >> $GITHUB_OUTPUT
+          echo "ccls version: $ver"
+
+      -
+        if: ${{ matrix.target == 'windows' }}
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+      - name: Prepare windows code
+        if: ${{ matrix.target == 'windows' }}
+        shell: cmd
+        run: |
+          cd /d c:\
+          curl -L -ollvm.7z https://github.com/fcying/tools/releases/download/llvm-v${{ env.llvm_ver }}/llvm_msvc.7z
+          #curl -L -ollvm.7z https://github.com/fcying/tools/releases/download/llvm-latest/llvm_msvc.7z
+          7z x llvm.7z
+          git clone --depth=1 --recursive https://github.com/MaskRay/ccls
+          dir
+      - name: Build windows
+        if: ${{ matrix.target == 'windows' }}
+        shell: cmd
+        run: |
+          cd /d c:\ccls
+          cmake -H. -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_PREFIX_PATH="c:/llvm/Release"
+          ninja -C Release
+
+          .\Release\ccls.exe --version
+          mkdir ccls
+          copy Release\ccls.exe .\ccls\
+          copy c:\Windows\System32\vcruntime140_1.dll .\ccls\
+          copy c:\Windows\System32\vcruntime140.dll .\ccls\
+          copy c:\Windows\System32\msvcp140.dll .\ccls\
+
+          7z -mx9 a c:\ccls_windows_amd64.zip ccls
+      - name: Setting up workflow variables
+        id: vars
+        shell: bash
+        run: |
+          # Package suffix relative to the platform
+          if [[ "${{ matrix.target }}" = windows ]]; then
+            PKG_PATH="c:\ccls_windows_amd64.zip"
+          else
+            PKG_PATH="/tmp/tools/ccls_linux_amd64.txz"
+          fi
+          echo "PKG_PATH: $PKG_PATH"
+          echo "PKG_PATH=$PKG_PATH" >> $GITHUB_OUTPUT
+      - uses: cloudposse/github-action-matrix-outputs-write@main
+        id: out
+        with:
+          matrix-step-name: ${{ github.job }}
+          matrix-key: ${{ matrix.platform }}
+          outputs: |-
+            version: ${{ steps.build.outputs.version }}
+      - uses: actions/upload-artifact@v3
+        with:
+          name: tools
+          path: ${{ steps.vars.outputs.PKG_PATH }}
+          retention-days: 1
+
+  publish:
+    needs: [build]
+    runs-on: ubuntu-latest
+    outputs:
+      version: "${{ fromJson(steps.read.outputs.result).version.linux-x64 }}"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+      - name: Download data
+        run: ls -la tools
+      - uses: cloudposse/github-action-matrix-outputs-read@main
+        id: read
+        with:
+          matrix-step-name: build
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_KEY: ${{ secrets.GITEE_KEY }}
+        run: |
+          #upload to draft, publish after clangd build end
+          echo "ccls version: ${{ fromJson(steps.read.outputs.result).version.linux-x64 }}"
+          tag_name=release_temp
+          while true; do
+            if [ $(gh release list | grep $tag_name -c) -ne 0 ]; then
+              break
+            fi
+            sleep 10
+          done
+          gh release upload $tag_name --clobber ./tools/*

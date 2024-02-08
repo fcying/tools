@@ -1,0 +1,160 @@
+name: clangd
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+  - cron: '0 18 * * *'
+  push:
+    branches: [ master, test ]
+  workflow_dispatch:
+
+jobs:
+  clangd:
+    runs-on: ubuntu-20.04
+    env:
+        cmake_rpath: >-
+          "-DCMAKE_EXE_LINKER_FLAGS=-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang -Wl,--compress-debug-sections=zlib"
+        cmake_static: >-
+          "-DLLVM_BUILD_STATIC=ON"
+          "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-s -Wl,--compress-debug-sections=zlib"
+        cmake: >-
+          "-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra;openmp"
+          "-DLLVM_ENABLE_ASSERTIONS=OFF"
+          "-DLLVM_ENABLE_BACKTRACES=ON"
+          "-DLLVM_ENABLE_TERMINFO=OFF"
+          "-DCMAKE_BUILD_TYPE=Release"
+          "-DCLANG_PLUGIN_SUPPORT=OFF"
+          "-DLLVM_ENABLE_PLUGINS=OFF"
+          "-DCMAKE_C_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG -include $GITHUB_WORKSPACE/.github/workflows/lib_compat.h"
+          "-DCMAKE_CXX_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG -include $GITHUB_WORKSPACE/.github/workflows/lib_compat.h"
+          "-DCLANGD_ENABLE_REMOTE=OFF"
+          "-DLLVM_ENABLE_ZSTD=OFF"
+          "-DCMAKE_C_COMPILER=clang"
+          "-DCMAKE_CXX_COMPILER=clang++"
+          "-DLLVM_STATIC_LINK_CXX_STDLIB=ON"
+          "-DLLVM_ENABLE_ZLIB=FORCE_ON"
+          "-DCMAKE_PROJECT_INCLUDE=$GITHUB_WORKSPACE/.github/workflows/linux-static-deps.cmake"
+
+    outputs:
+      clangd_ver: ${{ steps.clangd.outputs.version }}
+    steps:
+      - name: Init env
+        run: |
+          mkdir -p ~/tools
+
+          ver=$(curl -sv "https://github.com/ninja-build/ninja/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
+          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ver}/ninja-linux.zip
+          7z x ninja.zip
+          sudo mv ninja /usr/local/bin
+          ninja --version
+
+          sudo apt-get update
+          sudo apt-get install -y libz-dev libzstd-dev libc-ares-dev
+          clang++ --version
+          cmake --version
+
+      - name: Clone scripts
+        uses: actions/checkout@v4
+
+      - name: Download llvm
+        run: |
+          ver=$(curl -sv "https://github.com/llvm/llvm-project/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
+          src_link="https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/llvm-project-$ver.src.tar.xz"
+          wget -qOllvm.txz $src_link
+          tar xJf llvm.txz
+          mv llvm-project-* llvm-project
+          ls
+
+          #git clone https://github.com/llvm/llvm-project --depth 1
+          #cd llvm-project
+
+      - name: Build clangd
+        id: clangd
+        run: |
+          cd llvm-project
+
+          cmake -S llvm -B Release -G Ninja ${{ env.cmake }} ${{ env.cmake_rpath }}
+          ninja -C Release clangd
+
+          ldd Release/bin/clangd && du -b $_ && chmod +x $_
+          rm -rf ./bin ./lib
+          mkdir -p bin lib/clang
+
+          cp -r Release/lib/clang lib/
+
+          #mv Release/bin/clangd bin/
+          mv Release/bin/clangd bin/clangd_origin
+          # ld.so need in the save folder with clangd: get Qt error "No matching member function for call to 'connect'" with custom QObject
+          ldd bin/clangd_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} bin/ld.so
+          ldd bin/clangd_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
+          {
+            echo "#!/usr/bin/env bash"
+            echo 'cd "$(dirname $(readlink -f $0))"'
+            echo 'exec ./ld.so ./clangd_origin $@'
+          } > bin/clangd
+          chmod +x bin/clangd
+
+          ver=$(./bin/clangd --version | grep -Po "\d+\.\d+\.\d+")
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+          mkdir clangd && mv bin lib $_
+          XZ_OPT=-9 tar cJvf ~/tools/clangd_linux_amd64.txz clangd
+
+      - name: Build clang-format
+        run: >
+          cd llvm-project
+
+          cmake -S llvm -B Release -G Ninja
+          ${{ env.cmake }}
+          ${{ env.cmake_static }}
+
+          ninja -C Release clang-format
+      - name: Pack clang_format
+        id: clang_format
+        run: |
+          cd llvm-project
+          ldd Release/bin/clang-format && du -b $_ && chmod +x $_
+          rm -rf ./bin ./lib
+          mkdir -p bin lib/clang
+
+          mv Release/bin/clang-format bin/
+          #mv Release/bin/clang-format bin/clang-format_origin
+          #ldd bin/clang-format_origin | grep -Po "/lib64/ld-linux.*\.so\.\d+" | xargs -i cp -v {} lib/clang/ld.so
+          #ldd bin/clang-format_origin | grep -Po "/lib/x86.*\.so\.\d+" | xargs -i cp -v {} lib/clang/
+          #{
+            #echo "#!/usr/bin/env bash"
+            #echo 'cd "$(dirname $(readlink -f $0))"'
+            #echo 'exec ../lib/clang/ld.so ./clang-format_origin $@'
+          #} > bin/clang-format
+          #chmod +x bin/clang-format
+
+          mkdir clang_format && mv bin lib $_
+          XZ_OPT=-9 tar cJvf ~/tools/clang_format_linux_amd64.txz clang_format
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tools
+          path: ~/tools
+          retention-days: 1
+
+  publish:
+    needs: [clangd]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+      - name: Download data
+        run: ls -la tools
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_KEY: ${{ secrets.GITEE_KEY }}
+        run: |
+          gh release upload release_temp --clobber ./tools/*
+          gh release delete tools -y || true
+          git push origin :tools || true
+          sleep 5
+          gh release edit release_temp --tag tools --draft=false
