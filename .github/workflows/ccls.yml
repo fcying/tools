@@ -150,10 +150,10 @@ jobs:
           #upload to draft, publish after clangd build end
           echo "ccls version: ${{ fromJson(steps.read.outputs.result).version.linux-x64 }}"
           tag_name=release_temp
-          while true; do
+          for _ in {1..60}; do
             if [ $(gh release list | grep $tag_name -c) -ne 0 ]; then
+              gh release upload $tag_name --clobber ./tools/*
               break
             fi
             sleep 10
           done
-          gh release upload $tag_name --clobber ./tools/*

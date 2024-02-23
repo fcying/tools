@@ -53,8 +53,7 @@ jobs:
           git clone https://gitlab.com/saalen/astyle.git
           cd astyle
 
-          release=$(git tag | grep release)
-          ver=${release%_release}
+          ver=$(git describe --tags $(git rev-list --tags --max-count=1))
           git checkout $release
 
           cd AStyle
@@ -74,19 +73,18 @@ jobs:
         run: |
           ver=$(curl -sv "https://github.com/universal-ctags/ctags-nightly-build/releases/latest" 2>&1 | grep -Po "(?<=releases/tag/).*?\+\w+")
           date=$(echo $ver | grep -Po "^.*?(?=\+)")
+          echo $ver $date
           wget -qOuctags.txz https://github.com/universal-ctags/ctags-nightly-build/releases/download/$ver/uctags-$date-linux-x86_64.tar.xz
-          tar xJf uctags.txz
+          tar xJvf uctags.txz
           cd uctags-*/bin
-          ver=$(./ctags --version | grep -Po "(?<=Universal Ctags )\d+\.\d+\.\d+\(\w+\)")
+          ver=$(./ctags --version | grep -Po "(?<=Universal Ctags )\d+\.\d+\.\d+\(.*?\)")
+          echo "uctags version: $ver"
           echo "version=$ver" >> $GITHUB_OUTPUT
           XZ_OPT=-9 tar cJvf ~/tools/ctags_linux_amd64.txz ctags
       -
         name: Get autohotkey2 lsp #{{{
         id: ahk
         run: |
-          #git clone https://github.com/thqby/vscode-autohotkey2-lsp
-          #cd vscode-autohotkey2-lsp/tools
-
           mkdir autohotkey2-lsp && cd $_
           curl -L -o install.js https://raw.githubusercontent.com/thqby/vscode-autohotkey2-lsp/main/tools/install.js
           node install.js
@@ -166,7 +164,6 @@ jobs:
       - name: Check version
         id: build
         run: |
-          #ver=$(curl -s https://github.com/MaskRay/ccls/tags | grep -Po "(?<=/refs/tags/).*?(?=.zip)" | head -1)
           git clone --depth=1 https://github.com/MaskRay/ccls
           cd ccls
           ver="master-$(git rev-parse --short HEAD)"

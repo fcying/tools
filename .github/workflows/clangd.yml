@@ -153,8 +153,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
-          gh release upload release_temp --clobber ./tools/*
-          gh release delete tools -y || true
-          git push origin :tools || true
-          sleep 5
-          gh release edit release_temp --tag tools --draft=false
+          tag_name=release_temp
+          for _ in {1..60}; do
+            if [ $(gh release list | grep $tag_name -c) -ne 0 ]; then
+              gh release upload $tag_name --clobber ./tools/*
+              gh release delete tools -y || true
+              git push origin :tools || true
+              sleep 5
+              gh release edit $tag_name --tag tools --draft=false
+              break
+            fi
+            sleep 10
+          done
