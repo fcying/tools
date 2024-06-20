@@ -61,9 +61,9 @@ jobs:
       - name: Download llvm
         run: |
           ver=$(curl -sv "https://github.com/llvm/llvm-project/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
-          src_link="https://github.com/llvm/llvm-project/releases/download/llvmorg-$ver/llvm-project-$ver.src.tar.xz"
-          wget -qOllvm.txz $src_link
-          tar xJf llvm.txz
+          src_link="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-$ver.tar.gz"
+          wget -qOllvm.tgz $src_link
+          tar xzf llvm.tgz
           mv llvm-project-* llvm-project
           ls
 
