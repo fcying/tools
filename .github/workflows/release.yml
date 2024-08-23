@@ -139,9 +139,9 @@ jobs:
           unzip winscp.zip && rm winscp.zip
           7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: tools
+          name: tools-multi
           path: ~/tools
           retention-days: 1
 
@@ -200,9 +200,9 @@ jobs:
           mkdir lua-language-server
           cp -r main.lua debugger.lua LICENSE changelog.md locale meta script bin ./lua-language-server/
           XZ_OPT=-9 tar cJf ~/tools/lua-language-server-linux-x64.txz ./lua-language-server
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: tools
+          name: tools-luals
           path: ~/tools
           retention-days: 1
 
@@ -265,9 +265,9 @@ jobs:
           ldd ./tig || true
           XZ_OPT=-9 tar cJvf ~/tools/tig_linux_amd64.txz tig
           echo "version=$ver" >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: tools
+          name: tools-tig
           path: ~/tools
           retention-days: 1
 
@@ -276,9 +276,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v3
-      - name: Download data
-        run: ls -la tools
+      - uses: actions/download-artifact@v4
+        with:
+          path: tools
+          pattern: tools-*
+          merge-multiple: true
+      - run: ls -la tools
 
       - name: Publish
         env:

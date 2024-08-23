@@ -122,9 +122,9 @@ jobs:
           matrix-key: ${{ matrix.platform }}
           outputs: |-
             version: ${{ steps.build.outputs.version }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: tools
+          name: tools-ccls-${{ matrix.target }}
           path: ${{ steps.vars.outputs.PKG_PATH }}
           retention-days: 1
 
@@ -135,9 +135,12 @@ jobs:
       version: "${{ fromJson(steps.read.outputs.result).version.linux-x64 }}"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v3
-      - name: Download data
-        run: ls -la tools
+      - uses: actions/download-artifact@v4
+        with:
+          path: tools
+          pattern: tools-*
+          merge-multiple: true
+      - run: ls -la tools
       - uses: cloudposse/github-action-matrix-outputs-read@main
         id: read
         with:
