@@ -186,10 +186,11 @@ jobs:
           ninja --version
 
           git clone https://github.com/LuaLS/lua-language-server --recurse-submodules
-          cd lua-language-server/3rd/EmmyLuaCodeStyle
-          git checkout master
-          cd ../../
-          git add .
+          # cd lua-language-server/3rd/EmmyLuaCodeStyle
+          # git checkout master
+          # cd ../../
+          # git add .
+          cd lua-language-server
           ./make.sh
 
           chmod +x ./bin/*
