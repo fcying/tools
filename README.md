@@ -4,16 +4,10 @@
 * [tig static](https://github.com/jonas/tig)
 * [universal-ctags static](https://github.com/universal-ctags/ctags)
 * [astyle static](https://astyle.sourceforge.net/)
-* [ccls](https://github.com/MaskRay/ccls)
+* [atuin windows](https://github.com/atuinsh/atuin)
 * [clangd with rpath lib](https://github.com/clangd/clangd)
 * [clang-format static](https://github.com/llvm/llvm-project)
-* [lua-language-server](https://github.com/LuaLS/lua-language-server)
 * [autohotkey2-lsp](https://github.com/thqby/vscode-autohotkey2-lsp)
-* [winscp](https://winscp.net)
-* [putty](https://www.chiark.greenend.org.uk/~sgtatham/putty)
-* [MobaXterm](https://mobaxterm.mobatek.net/)
-* [make 3.8.2](https://ftp.gnu.org/gnu/make)
-* [openjdk](https://openjdk.java.net)
 * [llvm msvc](https://github.com/llvm/llvm-project)</BR>
     llvm project msvc build option
     ```

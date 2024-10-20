@@ -33,18 +33,18 @@ jobs:
           mkdir -p ~/tools
           echo $PATH
           echo $(date)
-      -
-        name: Build make 3.82
-        run: |
-          wget -qOmake.tgz https://ftp.gnu.org/gnu/make/make-3.82.tar.gz
-          tar xzvf make.tgz
-          cd make-3.82
-          sed -i 's/# if _GNU_GLOB_INTERFACE_VERSION == GLOB_INTERFACE_VERSION/# if _GNU_GLOB_INTERFACE_VERSION >= GLOB_INTERFACE_VERSION/' glob/glob.c
-          ./configure --prefix=/opt/make_3.8.2
-          make -j && make install
-          cd /opt/make_3.8.2/bin
-          ./make --version
-          XZ_OPT=-9 tar cJvf ~/tools/make_3.8.2_linux_amd64.txz /opt/make_3.8.2
+      # -
+      #   name: Build make 3.82
+      #   run: |
+      #     wget -qOmake.tgz https://ftp.gnu.org/gnu/make/make-3.82.tar.gz
+      #     tar xzvf make.tgz
+      #     cd make-3.82
+      #     sed -i 's/# if _GNU_GLOB_INTERFACE_VERSION == GLOB_INTERFACE_VERSION/# if _GNU_GLOB_INTERFACE_VERSION >= GLOB_INTERFACE_VERSION/' glob/glob.c
+      #     ./configure --prefix=/opt/make_3.8.2
+      #     make -j && make install
+      #     cd /opt/make_3.8.2/bin
+      #     ./make --version
+      #     XZ_OPT=-9 tar cJvf ~/tools/make_3.8.2_linux_amd64.txz /opt/make_3.8.2
       -
         name: Build astyle #{{{
         id: astyle
@@ -145,67 +145,62 @@ jobs:
           path: ~/tools
           retention-days: 1
 
-  clangd: #{{{
+  version: #{{{
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.build.outputs.version }}
+      clangd: ${{ steps.clangd.outputs.version }}
+      ccls: ${{ steps.ccls.outputs.version }}
     steps:
-      - name: Check version
-        id: build
+      -
+        id: clangd
         run: |
           ver=$(curl -sv "https://github.com/llvm/llvm-project/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
           echo "version=$ver" >> $GITHUB_OUTPUT
-
-  ccls: #{{{
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.build.outputs.version }}
-    steps:
-      - name: Check version
-        id: build
+      -
+        id: ccls
         run: |
           git clone --depth=1 https://github.com/MaskRay/ccls
           cd ccls
           ver="master-$(git rev-parse --short HEAD)"
           echo "version=$ver" >> $GITHUB_OUTPUT
 
-  luals: #{{{
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.build.outputs.version }}
-    steps:
-      - name: Build
-        id: build
-        run: |
-          mkdir -p ~/tools
-
-          ver=$(curl -sv "https://github.com/ninja-build/ninja/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
-          wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ver}/ninja-linux.zip
-          7z x ninja.zip
-          sudo mv ninja /usr/local/bin
-          ninja --version
-
-          git clone https://github.com/LuaLS/lua-language-server --recurse-submodules
-          # cd lua-language-server/3rd/EmmyLuaCodeStyle
-          # git checkout master
-          # cd ../../
-          # git add .
-          cd lua-language-server
-          ./make.sh
-
-          chmod +x ./bin/*
-          ver=$(./bin/lua-language-server --version)
-          ver="${ver}-$(git rev-parse --short HEAD)"
-          echo "version=$ver" >> $GITHUB_OUTPUT
-
-          mkdir lua-language-server
-          cp -r main.lua debugger.lua LICENSE changelog.md locale meta script bin ./lua-language-server/
-          XZ_OPT=-9 tar cJf ~/tools/lua-language-server-linux-x64.txz ./lua-language-server
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tools-luals
-          path: ~/tools
-          retention-days: 1
+  # luals: #{{{
+  #   runs-on: ubuntu-latest
+  #   outputs:
+  #     version: ${{ steps.build.outputs.version }}
+  #   steps:
+  #     - name: Build
+  #       id: build
+  #       run: |
+  #         mkdir -p ~/tools
+  #
+  #         ver=$(curl -sv "https://github.com/ninja-build/ninja/releases/latest" 2>&1 | grep -P location: | grep -Po "(\d+\.){2}\d+")
+  #         wget -qOninja.zip https://github.com/ninja-build/ninja/releases/download/v${ver}/ninja-linux.zip
+  #         7z x ninja.zip
+  #         sudo mv ninja /usr/local/bin
+  #         ninja --version
+  #
+  #         git clone https://github.com/LuaLS/lua-language-server --recurse-submodules
+  #         # cd lua-language-server/3rd/EmmyLuaCodeStyle
+  #         # git checkout master
+  #         # cd ../../
+  #         # git add .
+  #         cd lua-language-server
+  #         ./make.sh
+  #
+  #         chmod +x ./bin/*
+  #         ver=$(./bin/lua-language-server --version)
+  #         ver="${ver}-$(git rev-parse --short HEAD)"
+  #         echo "version=$ver" >> $GITHUB_OUTPUT
+  #
+  #         mkdir lua-language-server
+  #         cp -r main.lua debugger.lua LICENSE changelog.md locale meta script bin ./lua-language-server/
+  #         XZ_OPT=-9 tar cJf ~/tools/lua-language-server-linux-x64.txz ./lua-language-server
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: tools-luals
+  #         path: ~/tools
+  #         retention-days: 1
 
   tig: #{{{
     runs-on: ubuntu-20.04
@@ -272,8 +267,29 @@ jobs:
           path: ~/tools
           retention-days: 1
 
+  atuin:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          msystem: UCRT64
+      - run: pacman --noconfirm -Syu p7zip mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-protobuf # protobuf is needed by atuin
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          cargo install atuin
+          7z -mx9 a /c/atuin_windows_amd64.zip /c/Users/runneradmin/.cargo/bin/atuin.exe
+      - name: 'Upload Artifact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tools-atuin
+          path: c:\atuin_windows_amd64.zip
+
   publish: #{{{
-    needs: [ubuntu, clangd, ccls, luals, tig]
+    needs: [ubuntu, version, tig, atuin]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -290,19 +306,20 @@ jobs:
           GITEE_KEY: ${{ secrets.GITEE_KEY }}
         run: |
           {
-            echo "* clangd ${{ needs.clangd.outputs.version }} last release with rpath lib"
-            echo "* clang-format ${{ needs.clangd.outputs.version }} last release static"
-            echo "* ccls ${{ needs.ccls.outputs.version }} linux (build with llvm ${{ env.llvm_ver }})"
-            echo "* ccls ${{ needs.ccls.outputs.version }} windows(build with llvm ${{ env.llvm_ver }})"
+            echo "* clangd ${{ needs.version.outputs.clangd }} last release with rpath lib"
+            echo "* clang-format ${{ needs.version.outputs.clangd }} last release static"
+            # echo "* ccls ${{ needs.version.outputs.ccls }} linux (build with llvm ${{ env.llvm_ver }})"
+            # echo "* ccls ${{ needs.version.outputs.cls }} windows(build with llvm ${{ env.llvm_ver }})"
             echo "* uctags ${{ needs.ubuntu.outputs.uctags_ver }} static"
-            echo "* luals ${{ needs.luals.outputs.version }}"
+            # echo "* luals ${{ needs.luals.outputs.version }}"
             echo "* autohotkey2-lsp ${{ needs.ubuntu.outputs.ahk_ver }}"
             echo "* tig ${{ needs.tig.outputs.version }} static"
+            echo "* atuin windows last release"
             echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
-            echo "* make 3.8.2"
-            echo "* putty ${{ needs.ubuntu.outputs.putty_ver }}"
-            echo "* MobaXterm ${{ needs.ubuntu.outputs.mobaxterm_ver }}"
-            echo "* winscp ${{ needs.ubuntu.outputs.winscp_ver }}"
+            # echo "* make 3.8.2"
+            # echo "* putty ${{ needs.ubuntu.outputs.putty_ver }}"
+            # echo "* MobaXterm ${{ needs.ubuntu.outputs.mobaxterm_ver }}"
+            # echo "* winscp ${{ needs.ubuntu.outputs.winscp_ver }}"
           } | tee /tmp/note.md
           #upload to draft, publish after clangd build end
           tag_name=release_temp

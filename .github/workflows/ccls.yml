@@ -4,10 +4,10 @@ permissions:
   contents: write
 
 on:
-  schedule:
-  - cron: '0 18 * * *'
-  push:
-    branches: [ master, test ]
+  # schedule:
+  # - cron: '0 18 * * *'
+  # push:
+  #   branches: [ master, test ]
   workflow_dispatch:
 
 env:
