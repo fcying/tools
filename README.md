@@ -3,7 +3,6 @@
 #### binary ([download](https://github.com/fcying/tools/releases))
 * [tig static](https://github.com/jonas/tig)
 * [universal-ctags static](https://github.com/universal-ctags/ctags)
-* [astyle static](https://astyle.sourceforge.net/)
 * [atuin windows](https://github.com/atuinsh/atuin)
 * [clangd with rpath lib](https://github.com/clangd/clangd)
 * [clang-format static](https://github.com/llvm/llvm-project)

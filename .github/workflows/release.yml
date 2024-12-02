@@ -20,7 +20,7 @@ jobs:
       winscp_ver: ${{ steps.winscp.outputs.version }}
       putty_ver: ${{ steps.putty.outputs.version }}
       mobaxterm_ver: ${{ steps.mobaxterm.outputs.version }}
-      astyle_ver: ${{ steps.astyle.outputs.version }}
+      # astyle_ver: ${{ steps.astyle.outputs.version }}
       ahk_ver: ${{ steps.ahk.outputs.version }}
       uctags_ver: ${{ steps.uctags.outputs.version }}
     env:
@@ -45,28 +45,28 @@ jobs:
       #     cd /opt/make_3.8.2/bin
       #     ./make --version
       #     XZ_OPT=-9 tar cJvf ~/tools/make_3.8.2_linux_amd64.txz /opt/make_3.8.2
-      -
-        name: Build astyle #{{{
-        id: astyle
-        run: |
-          echo "build astyle latest"
-          git clone https://gitlab.com/saalen/astyle.git
-          cd astyle
-
-          ver=$(git describe --tags $(git rev-list --tags --max-count=1))
-          git checkout $release
-
-          cd AStyle
-          mkdir out && cd $_
-          cmake ../ -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static"
-          make -j
-
-          chmod a+x ./astyle
-          ./astyle --version
-          ldd ./astyle || true
-          XZ_OPT=-9 tar cJvf ~/tools/astyle_linux_amd64.txz astyle
-
-          echo "version=$ver" >> $GITHUB_OUTPUT
+      # -
+      #   name: Build astyle #{{{
+      #   id: astyle
+      #   run: |
+      #     echo "build astyle latest"
+      #     git clone https://gitlab.com/saalen/astyle.git
+      #     cd astyle
+      #
+      #     ver=$(git describe --tags $(git rev-list --tags --max-count=1))
+      #     git checkout $release
+      #
+      #     cd AStyle
+      #     mkdir out && cd $_
+      #     cmake ../ -DCMAKE_EXE_LINKER_FLAGS_RELEASE="-static"
+      #     make -j
+      #
+      #     chmod a+x ./astyle
+      #     ./astyle --version
+      #     ldd ./astyle || true
+      #     XZ_OPT=-9 tar cJvf ~/tools/astyle_linux_amd64.txz astyle
+      #
+      #     echo "version=$ver" >> $GITHUB_OUTPUT
       -
         name: Get uctags #{{{
         id: uctags
@@ -74,7 +74,7 @@ jobs:
           ver=$(curl -sv "https://github.com/universal-ctags/ctags-nightly-build/releases/latest" 2>&1 | grep -Po "(?<=releases/tag/).*?\+\w+")
           date=$(echo $ver | grep -Po "^.*?(?=\+)")
           echo $ver $date
-          wget -qOuctags.txz https://github.com/universal-ctags/ctags-nightly-build/releases/download/$ver/uctags-$date-linux-x86_64.tar.xz
+          wget -qOuctags.txz https://github.com/universal-ctags/ctags-nightly-build/releases/download/$ver/uctags-$date-linux-x86_64.release.tar.xz
           tar xJvf uctags.txz
           cd uctags-*/bin
           ver=$(./ctags --version | grep -Po "(?<=Universal Ctags )\d+\.\d+\.\d+\(.*?\)")
@@ -315,7 +315,7 @@ jobs:
             echo "* autohotkey2-lsp ${{ needs.ubuntu.outputs.ahk_ver }}"
             echo "* tig ${{ needs.tig.outputs.version }} static"
             echo "* atuin windows last release"
-            echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
+            # echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
             # echo "* make 3.8.2"
             # echo "* putty ${{ needs.ubuntu.outputs.putty_ver }}"
             # echo "* MobaXterm ${{ needs.ubuntu.outputs.mobaxterm_ver }}"
