@@ -89,8 +89,8 @@ jobs:
           curl -L -o install.js https://raw.githubusercontent.com/thqby/vscode-autohotkey2-lsp/main/tools/install.js
           node install.js
 
-          ver=$(cat CHANGELOG.md | head -1 | grep -Po "(\d+\.){2}\d+")
-          echo "version=$ver" >> $GITHUB_OUTPUT
+          # ver=$(cat CHANGELOG.md | head -1 | grep -Po "(\d+\.){2}\d+")
+          # echo "version=$ver" >> $GITHUB_OUTPUT
 
           cd ../
           7z -mx9 a ~/tools/autohotkey2-lsp.zip ./autohotkey2-lsp
@@ -312,7 +312,8 @@ jobs:
             # echo "* ccls ${{ needs.version.outputs.cls }} windows(build with llvm ${{ env.llvm_ver }})"
             echo "* uctags ${{ needs.ubuntu.outputs.uctags_ver }} static"
             # echo "* luals ${{ needs.luals.outputs.version }}"
-            echo "* autohotkey2-lsp ${{ needs.ubuntu.outputs.ahk_ver }}"
+            # echo "* autohotkey2-lsp ${{ needs.ubuntu.outputs.ahk_ver }}"
+            echo "* autohotkey2-lsp latest"
             echo "* tig ${{ needs.tig.outputs.version }} static"
             echo "* atuin windows last release"
             # echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
