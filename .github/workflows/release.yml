@@ -88,11 +88,10 @@ jobs:
           mkdir autohotkey2-lsp && cd $_
           curl -L -o install.js https://raw.githubusercontent.com/thqby/vscode-autohotkey2-lsp/main/tools/install.js
           node install.js
-
-          ver=$(cat CHANGELOG.md | head -1 | grep -Po "(\d+\.){2}\d+")
-          echo "version=$ver" >> $GITHUB_OUTPUT
-
+          ver=$(cat package.json | grep '"version":' | grep -Po "(\d+\.){2}\d+")
           cd ../
+
+          echo "version=$ver" >> $GITHUB_OUTPUT
           7z -mx9 a ~/tools/autohotkey2-lsp.zip ./autohotkey2-lsp
       -
         name: Get putty #{{{
