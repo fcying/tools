@@ -12,7 +12,7 @@ on:
 
 jobs:
   clangd:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
         cmake_rpath: >-
           "-DCMAKE_EXE_LINKER_FLAGS=-static-libgcc -Wl,-s -Wl,-rpath=../lib/clang -Wl,--compress-debug-sections=zlib"

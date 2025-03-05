@@ -15,7 +15,7 @@ env:
 
 jobs:
   ubuntu: #{{{
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       winscp_ver: ${{ steps.winscp.outputs.version }}
       putty_ver: ${{ steps.putty.outputs.version }}
@@ -202,7 +202,7 @@ jobs:
   #         retention-days: 1
 
   tig: #{{{
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.build.outputs.version }}
     steps:
