@@ -268,19 +268,17 @@ jobs:
 
   atuin:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
-      - uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          msystem: UCRT64
-      - run: pacman --noconfirm -Syu p7zip mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-protobuf # protobuf is needed by atuin
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        # with:
+          # toolchain: "1.85.1"
       - run: |
-          cargo install atuin
-          7z -mx9 a /c/atuin_windows_amd64.zip /c/Users/runneradmin/.cargo/bin/atuin.exe
+          cargo install --locked atuin
+          # git clone https://github.com/atuinsh/atuin.git
+          # git clone https://github.com/fcying/atuin.git
+          # cd atuin/crates/atuin
+          # cargo install --locked --path .
+          7z -mx9 a c:\atuin_windows_amd64.zip c:\Users\runneradmin\.cargo\bin\atuin.exe
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v4
         with:
