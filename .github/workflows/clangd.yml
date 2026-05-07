@@ -20,15 +20,21 @@ jobs:
           "-DLLVM_BUILD_STATIC=ON"
           "-DCMAKE_EXE_LINKER_FLAGS=-Wl,-s -Wl,--compress-debug-sections=zlib"
         cmake: >-
-          "-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra;openmp"
+          "-DLLVM_ENABLE_PROJECTS=clang;clang-tools-extra"
           "-DLLVM_ENABLE_ASSERTIONS=OFF"
           "-DLLVM_ENABLE_BACKTRACES=ON"
           "-DLLVM_ENABLE_TERMINFO=OFF"
+          "-DLLVM_ENABLE_LIBEDIT=OFF"
+          "-DLLVM_INCLUDE_TESTS=OFF"
+          "-DLLVM_INCLUDE_EXAMPLES=OFF"
+          "-DLLVM_ENABLE_BINDINGS=OFF"
+          "-DLLVM_ENABLE_OCAMLDOC=OFF"
+          "-DLLVM_TARGETS_TO_BUILD=X86"
           "-DCMAKE_BUILD_TYPE=Release"
           "-DCLANG_PLUGIN_SUPPORT=OFF"
           "-DLLVM_ENABLE_PLUGINS=OFF"
-          "-DCMAKE_C_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG -include $GITHUB_WORKSPACE/.github/workflows/lib_compat.h"
-          "-DCMAKE_CXX_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG -include $GITHUB_WORKSPACE/.github/workflows/lib_compat.h"
+          "-DCMAKE_C_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG"
+          "-DCMAKE_CXX_FLAGS_RELEASE=-Os -gline-tables-only -DNDEBUG"
           "-DCLANGD_ENABLE_REMOTE=OFF"
           "-DLLVM_ENABLE_ZSTD=OFF"
           "-DCMAKE_C_COMPILER=clang"
@@ -60,15 +66,15 @@ jobs:
 
       - name: Download llvm
         run: |
-          ver=$(curl -sv "https://github.com/llvm/llvm-project/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
-          src_link="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-$ver.tar.gz"
-          wget -qOllvm.tgz $src_link
-          tar xzf llvm.tgz
-          mv llvm-project-* llvm-project
-          ls
+          # ver=$(curl -sv "https://github.com/llvm/llvm-project/releases/latest" 2>&1 | grep -P location: | grep -Po "\d+\.\d+\.\d+")
+          # src_link="https://github.com/llvm/llvm-project/archive/refs/tags/llvmorg-$ver.tar.gz"
+          # wget -qOllvm.tgz $src_link
+          # tar xzf llvm.tgz
+          # mv llvm-project-* llvm-project
+          # ls
 
-          #git clone https://github.com/llvm/llvm-project --depth 1
-          #cd llvm-project
+          git clone https://github.com/llvm/llvm-project --depth 1
+          cd llvm-project
 
       - name: Build clangd
         id: clangd
