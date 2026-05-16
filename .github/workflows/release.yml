@@ -138,7 +138,7 @@ jobs:
           unzip winscp.zip && rm winscp.zip
           7z -mx9 a ~/tools/winscp_${ver}.zip ../winscp
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tools-multi
           path: ~/tools
@@ -195,7 +195,7 @@ jobs:
   #         mkdir lua-language-server
   #         cp -r main.lua debugger.lua LICENSE changelog.md locale meta script bin ./lua-language-server/
   #         XZ_OPT=-9 tar cJf ~/tools/lua-language-server-linux-x64.txz ./lua-language-server
-  #     - uses: actions/upload-artifact@v4
+  #     - uses: actions/upload-artifact@v7
   #       with:
   #         name: tools-luals
   #         path: ~/tools
@@ -260,37 +260,71 @@ jobs:
           ldd ./tig || true
           XZ_OPT=-9 tar cJvf ~/tools/tig_linux_amd64.txz tig
           echo "version=$ver" >> $GITHUB_OUTPUT
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: tools-tig
           path: ~/tools
           retention-days: 1
 
-  atuin:
-    runs-on: windows-latest
+  tree_sitter: #{{{
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.build.outputs.version }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-unknown-linux-gnu
+      - name: Build
+        id: build
+        run: |
+          sudo apt-get update
+          mkdir -p ~/tools
+
+          ver=$(curl -sv "https://github.com/tree-sitter/tree-sitter/releases/latest" 2>&1 | grep -P location: | grep -Po "(?<=v)(\d+\.){2}\d+")
+          wget -qOtree-sitter.tgz https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v$ver.tar.gz
+          tar xzf tree-sitter.tgz
+          cd tree-sitter-*
+
+          RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --locked --target x86_64-unknown-linux-gnu -p tree-sitter-cli
+          cp target/x86_64-unknown-linux-gnu/release/tree-sitter .
+          chmod a+x ./tree-sitter
+          ./tree-sitter --version
+          ldd_out=$(ldd ./tree-sitter 2>&1 || true)
+          echo "$ldd_out"
+          if echo "$ldd_out" | grep -Eq '=>|ld-linux'; then
+            exit 1
+          fi
+          XZ_OPT=-9 tar cJvf ~/tools/tree-sitter_linux_amd64.txz tree-sitter
+          echo "version=$ver" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tools-tree-sitter
+          path: ~/tools
+          retention-days: 1
+
+  atuin:
+    runs-on: windows-2025
+    steps:
+      - name: Setup Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         # with:
           # toolchain: "1.85.1"
-      - run: |
-          cargo install --locked atuin
-          # git clone https://github.com/atuinsh/atuin.git
-          # git clone https://github.com/fcying/atuin.git
-          # cd atuin/crates/atuin
-          # cargo install --locked --path .
-          7z -mx9 a c:\atuin_windows_amd64.zip c:\Users\runneradmin\.cargo\bin\atuin.exe
+      - name: Install Atuin
+        run: cargo install --locked atuin
+      - name: Archive Binary
+        run: 7z -mx9 a c:\atuin_windows_amd64.zip c:\Users\runneradmin\.cargo\bin\atuin.exe
       - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tools-atuin
           path: c:\atuin_windows_amd64.zip
 
   publish: #{{{
-    needs: [ubuntu, version, tig, atuin]
+    needs: [ubuntu, version, tig, tree_sitter, atuin]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
         with:
           path: tools
           pattern: tools-*
@@ -311,6 +345,7 @@ jobs:
             # echo "* luals ${{ needs.luals.outputs.version }}"
             echo "* autohotkey2-lsp ${{ needs.ubuntu.outputs.ahk_ver }}"
             echo "* tig ${{ needs.tig.outputs.version }} static"
+            echo "* tree-sitter ${{ needs.tree_sitter.outputs.version }} static"
             echo "* atuin windows last release"
             # echo "* astyle ${{ needs.ubuntu.outputs.astyle_ver }} static"
             # echo "* make 3.8.2"

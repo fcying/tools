@@ -2,6 +2,7 @@
 
 #### binary ([download](https://github.com/fcying/tools/releases))
 * [tig static](https://github.com/jonas/tig)
+* [tree-sitter static](https://github.com/tree-sitter/tree-sitter)
 * [universal-ctags static](https://github.com/universal-ctags/ctags)
 * [atuin windows](https://github.com/atuinsh/atuin)
 * [clangd with rpath lib](https://github.com/clangd/clangd)
@@ -33,4 +34,3 @@ cd openjdk*
 ./configure --prefix=/opt/jdk_1.7.0_201 --with-jdk-home=/usr/lib/jvm/java-7-openjdk-amd64 --disable-tests --disable-docs --disable-bootstrap --disable-bootstrap-tools --without-rhino --disable-system-kerberos --disable-system-jpeg --disable-system-png --disable-system-gif --disable-system-lcms --disable-system-gtk --disable-system-gio --disable-system-gconf --disable-compile-against-syscalls
 make -j && make install
 ```
-

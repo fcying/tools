@@ -2,9 +2,10 @@ name: llvm
 
 on:
   schedule:
-  - cron: '0 12 * * 1'
+    - cron: '0 12 * * 1'
   push:
-    tags: v[0-9]+.[0-9]+.[0-9]+
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+
   workflow_dispatch:
     inputs:
       llvm_ver:
@@ -12,9 +13,12 @@ on:
         required: true
         default: "latest"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2025
     defaults:
       run:
         shell: cmd
@@ -34,51 +38,69 @@ jobs:
 
       - name: Check version
         run: |
-          echo "llvm_ver:" ${{ github.event.inputs.llvm_ver }}
-          echo "event_name:" ${{ github.event_name }}
-      - if: github.event.inputs.llvm_ver == 'latest' || github.event_name == 'schedule'
+          echo llvm_ver: ${{ github.event.inputs.llvm_ver }}
+          echo event_name: ${{ github.event_name }}
+
+      - name: Set env for latest or schedule
+        if: github.event.inputs.llvm_ver == 'latest' || github.event_name == 'schedule'
         run: |
           echo ver=latest>> %GITHUB_ENV%
           echo branch=main>> %GITHUB_ENV%
-      - if: github.event.inputs.llvm_ver != '' && github.event.inputs.llvm_ver != 'latest'
+
+      - name: Set env for manual custom version
+        if: github.event.inputs.llvm_ver != '' && github.event.inputs.llvm_ver != 'latest'
         run: |
           echo ver=v${{ github.event.inputs.llvm_ver }}>> %GITHUB_ENV%
           echo branch=llvmorg-${{ github.event.inputs.llvm_ver }}>> %GITHUB_ENV%
-      - if: github.event_name == 'push'
+
+      - name: Set env for tag push
+        if: github.event_name == 'push'
         run: |
           echo ver=v${{ steps.tagName.outputs.tag }}>> %GITHUB_ENV%
           echo branch=llvmorg-${{ steps.tagName.outputs.tag }}>> %GITHUB_ENV%
-      - id: version
+
+      - name: Output version
+        id: version
         run: |
-          echo version=${{ env.ver }} >> %GITHUB_OUTPUT%
+          echo version=%ver%>> %GITHUB_OUTPUT%
 
       - name: Build llvm
         run: |
-          git clone --depth=1 https://github.com/llvm/llvm-project.git -b ${{ env.branch }} llvm
+          git clone --depth=1 https://github.com/llvm/llvm-project.git -b %branch% llvm
           cd llvm
           rmdir /s /q .git
-          cmake -Hllvm -BRelease -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_PROJECTS=clang -DLLVM_ENABLE_DIA_SDK=OFF
+          cmake -S llvm -B Release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_PROJECTS=clang -DLLVM_ENABLE_DIA_SDK=OFF
           ninja -C Release clangFormat clangFrontendTool clangIndex clangTooling clang
 
       - name: Compress llvm
         run: |
-          7z a llvm_msvc.7z -mx9 llvm
+          7z a c:\llvm_msvc.7z -mx9 llvm
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
         with:
           name: llvm
-          path: c:\llvm_msvc.7z
+          path: C:\llvm_msvc.7z
           retention-days: 1
 
   publish:
     needs: [windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-      - name: Download data
-        run: ls -la
-      - name: Publish
+      - uses: actions/checkout@v6
+
+      - name: Download artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: llvm
+          path: llvm
+
+      - name: Verify downloaded files
+        run: |
+          pwd
+          ls -la llvm
+
+      - name: Publish to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -86,13 +108,17 @@ jobs:
             echo "llvm version: ${{ needs.windows.outputs.version }}"
             echo "VC++ compiler toolset version: 14.29"
           } | tee /tmp/note.md
+
           temp_name=llvm_temp
           tag_name=llvm-${{ needs.windows.outputs.version }}
+
           gh release delete $temp_name -y || true
           git push origin :$tag_name || true
           gh release delete $tag_name -y || true
           git push origin :$temp_name || true
+
           gh release create $temp_name -t $tag_name -F "/tmp/note.md" -d --target $GITHUB_SHA
           gh release upload $temp_name --clobber ./llvm/*
+
           sleep 5
           gh release edit $temp_name --tag $tag_name --draft=false
